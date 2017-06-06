@@ -1,0 +1,49 @@
+/*
+ * Copyright (c) 2017 Luca Baldesi
+ *
+ * This file is part of PeerStreamer.
+ *
+ * PeerStreamer is free software: you can redistribute it and/or
+ * modify it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * PeerStreamer is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero
+ * General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with PeerStreamer.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
+
+#ifndef __PSCONTEXT_H__ 
+#define __PSCONTEXT_H__ 
+
+#include<stdint.h>
+
+#define MSG_BUFFSIZE (512 * 1024)
+#define FDSSIZE 16
+
+typedef long suseconds_t;
+
+struct psinstance;
+
+struct psinstance * psinstance_create(const char * srv_ip, const int srv_port, const char * config);
+
+void psinstance_destroy(struct psinstance ** ps);
+
+int8_t psinstance_send_offer(const struct psinstance * ps);
+
+int8_t psinstance_inject_chunk(struct psinstance * ps);
+
+int8_t psinstance_handle_msg(const struct psinstance * ps);
+
+int psinstance_poll(struct psinstance *ps, suseconds_t);
+
+int psinstance_select_init(struct psinstance * ps);
+
+uint8_t psinstance_select_action(struct psinstance * ps);
+
+#endif
