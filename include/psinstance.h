@@ -40,10 +40,10 @@ int8_t psinstance_inject_chunk(struct psinstance * ps);
 
 int8_t psinstance_handle_msg(const struct psinstance * ps);
 
+int8_t psinstance_topology_update(const struct psinstance * ps);
+
+suseconds_t psinstance_offer_interval(const struct psinstance * ps);
+
 int psinstance_poll(struct psinstance *ps, suseconds_t);
-
-int psinstance_select_init(struct psinstance * ps);
-
-uint8_t psinstance_select_action(struct psinstance * ps);
 
 #endif

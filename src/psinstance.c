@@ -34,6 +34,7 @@
 #include<dbg.h>
 #include<chunk_signaling.h>
 #include<streaming_timers.h>
+#include<pstreamer_event.h>
 
 struct psinstance {
 	struct nodeID * my_sock;
@@ -313,4 +314,22 @@ int psinstance_poll(struct psinstance *ps, suseconds_t delta)
 				topology_update(ps->topology);
 	}
 	return data_state;
+}
+
+int8_t psinstance_topology_update(const struct psinstance * ps)
+{
+	if (ps && ps->topology)
+		topology_update(ps->topology);
+	return 0;
+}
+
+suseconds_t psinstance_offer_interval(const struct psinstance * ps)
+{
+	return ps->chunk_offer_interval;
+}
+
+int pstreamer_register_fds(const struct psinstance * ps, fd_register_f func, void *handler)
+{
+	register_network_fds(ps->my_sock, func, handler);
+	return 0;
 }

@@ -137,24 +137,24 @@ const char *hostname_ip_addr()
   int error;
 
   if (gethostname(hostname, sizeof hostname) < 0) {
-    dtprintf(stderr, "can't get hostname\n");
+    dtprintf("can't get hostname\n");
     return NULL;
   }
-  dtprintf(stderr, "hostname is: %s ...", hostname);
+  dtprintf("hostname is: %s ...", hostname);
 
   /* resolve the domain name into a list of addresses */
   error = getaddrinfo(hostname, NULL, NULL, &result);
   if (error != 0) {
-    dtprintf(stderr, "can't resolve IP: %s\n", gai_strerror(error));
+    dtprintf("can't resolve IP: %s\n", gai_strerror(error));
     return NULL;
   }
 
   /* loop over all returned results and do inverse lookup */
   for (res = result; res != NULL; res = res->ai_next) {
     ip = inet_ntoa(((struct sockaddr_in*)res->ai_addr)->sin_addr);
-    dtprintf(stderr, "IP is: %s ...", ip);
+    dtprintf("IP is: %s ...", ip);
     if ( strncmp("127.", ip, 4) == 0) {
-      dtprintf(stderr, ":( ...");
+      dtprintf(":( ...");
       ip = NULL;
     } else {
       break;
@@ -313,15 +313,15 @@ char *default_ip_addr()
 {
   char *ip = NULL;
 
-  dtprintf(stderr, "Trying to guess IP ...");
+  dtprintf("Trying to guess IP ...");
 
   ip = autodetect_ip_address();
 
   if (!ip) {
-    dtprintf(stderr, "cannot detect IP!\n");
+    dtprintf("cannot detect IP!\n");
     return NULL;
   }
-  dtprintf(stderr, "IP is: %s ...\n", ip);
+  dtprintf("IP is: %s ...\n", ip);
 
   return ip;
 }

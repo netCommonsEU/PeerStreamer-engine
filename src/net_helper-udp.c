@@ -13,6 +13,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
+#include <pstreamer_event.h>
 
 #ifndef _WIN32
 #include <sys/socket.h>
@@ -190,6 +191,13 @@ int wait4data(const struct nodeID *s, struct timeval *tout, int *user_fds)
   }
 
   return 2;
+}
+
+int register_network_fds(const struct nodeID *s, fd_register_f func, void *handler)
+{
+	if (s) 
+		func(handler, s->fd, 'r');
+	return 0;
 }
 
 struct nodeID *create_node(const char *IPaddr, int port)
