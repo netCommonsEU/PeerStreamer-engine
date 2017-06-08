@@ -23,11 +23,13 @@
 #define NET_HELPERS_H
 
 #include<net_helper.h>
+#include<pstreamer_event.h>
 
 #define NODE_STR_LENGTH 80
 
 char *iface_addr(const char *iface);
 char *default_ip_addr();
 char * nodeid_static_str(const struct nodeID * id);
+int register_network_fds(const struct nodeID *s, fd_register_f func, void *handler);
 
 #endif	/* NET_HELPERS_H */
