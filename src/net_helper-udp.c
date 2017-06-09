@@ -484,7 +484,12 @@ struct nodeID *nodeid_undump(const uint8_t *b, int *len)
 
 void nodeid_free(struct nodeID *s)
 {
-  free(s);
+  if (s)
+  {
+    if (s->fd >= 0)
+      close(s->fd);
+    free(s);
+  }
 }
 
 int node_ip(const struct nodeID *s, char *ip, int len)
