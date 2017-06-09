@@ -46,10 +46,17 @@ struct chunk_locks{
 
 void chunk_locks_destroy(struct chunk_locks ** cl)
 {
+	size_t i;
+
 	if (cl && *cl)
 	{
 		if ((*cl)->locks)
+		{
+			for (i=0; i<(*cl)->lcount; i++) 
+				if ((*cl)->locks[i].peer)
+					nodeid_free((*cl)->locks[i].peer);
 			free((*cl)->locks);
+		}
 		free(*cl);
 		*cl = NULL;
 	}
@@ -95,7 +102,8 @@ int chunk_lock_timed_out(struct lock *l)
 }
 
 void chunk_lock_remove(struct chunk_locks * cl, struct lock *l){
-  nodeid_free(l->peer);
+  if (l->peer)
+	  nodeid_free(l->peer);
   memmove(l, l+1, sizeof(struct lock) * (cl->locks+(cl->lcount)-l-1));
   cl->lcount--;
 }
