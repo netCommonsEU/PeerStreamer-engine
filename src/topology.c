@@ -462,7 +462,3 @@ void topology_destroy(struct topology **t)
 		free(*t);
 	}
 }
-
-uint8_t topology_peer_cbsize(const struct topology *t, const struct peer * p)
-{
-}

@@ -95,7 +95,7 @@ int8_t reg_chunk_receive(struct measures * m, int cid, uint64_t ctimestamp, int 
 				break;
 			case loading:
 			case ready:
-				if (cid > m->cie.first_index)
+				if (cid > (int64_t)m->cie.first_index)
 					m->cie.chunk_interval = ((ctimestamp - m->cie.first_timestamp))/(cid - m->cie.first_index);
 				m->cie.state = ready;
 				break;
