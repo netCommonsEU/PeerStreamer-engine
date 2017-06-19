@@ -32,7 +32,7 @@ struct streaming_context;
 
 void received_chunk(struct streaming_context * strc, struct nodeID *from, const uint8_t *buff, int len);
 
-void send_chunk(const struct streaming_context * stc);
+void send_chunk(struct streaming_context * stc);
 
 struct chunk *generated_chunk(struct streaming_context * strc, suseconds_t *delta);
 
@@ -40,7 +40,7 @@ int add_chunk(struct streaming_context * strc, struct chunk *c);
 
 struct chunkID_set *get_chunks_to_accept(const struct streaming_context * strc, struct nodeID *fromid, const struct chunkID_set *cset_off, int max_deliver, uint16_t trans_id);
 
-void send_offer(const struct streaming_context * stc);
+void send_offer(struct streaming_context * stc);
 
 void send_accepted_chunks(const struct streaming_context * stc, struct nodeID *to, struct chunkID_set *cset_acc, int max_deliver, uint16_t trans_id);
 
@@ -54,7 +54,7 @@ void log_neighbourhood(const struct streaming_context * stc);
 
 void log_signal(const struct nodeID *fromid,const struct nodeID *toid,const int cidset_size,uint16_t trans_id,enum signaling_type type,const char *flag);
 
-int inject_chunk(const struct streaming_context * stc, const struct chunk * target_chunk,const int multiplicity);
+int inject_chunk(struct streaming_context * stc, const struct chunk * target_chunk,const int multiplicity);
 
 struct streaming_context * streaming_create(const struct psinstance * ps, struct input_context * inc, const char * config);
 

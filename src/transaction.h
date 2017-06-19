@@ -33,7 +33,7 @@ struct service_times_element;
 
 // register the moment when a transaction is started
 // return a  new transaction id
-uint16_t transaction_create(struct service_times_element * head, struct nodeID *id);
+uint16_t transaction_create(struct service_times_element ** head, struct nodeID *id);
 
 // Add the moment I received a positive select in a list
 // return true if a valid trans_id is found
@@ -42,7 +42,7 @@ bool transaction_reg_accept(struct service_times_element * head, uint16_t trans_
 // Used to get the time elapsed from the moment I get a positive select to the moment i get the ACK
 // related to the same chunk
 // it return -1.0 in case no trans_id is found
-double transaction_remove(struct service_times_element * head, uint16_t trans_id);
+double transaction_remove(struct service_times_element ** head, uint16_t trans_id);
 
 void transactions_destroy(struct service_times_element * head);
 

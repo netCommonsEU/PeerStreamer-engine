@@ -45,8 +45,29 @@ struct service_times_element {
 	};
 
 
+void _transaction_remove(struct service_times_element ** head, struct service_times_element *stl)
+{
+	if (stl->backward == NULL) {
+		if (stl->forward)
+		{
+			*head = stl->forward;
+			(*head)->backward = NULL;
+		} else
+			*head = NULL;
+	}
+	else {
+		if (stl->forward == NULL)
+			stl->backward->forward = NULL;
+		else {
+			stl->backward->forward = stl->forward;
+			stl->forward->backward = stl->backward;
+		}
+	}
+	free(stl);
+}	
+
 // Check the service times list to find elements over the timeout
-void check_neighbor_status_list(struct service_times_element * stl) {
+void check_neighbor_status_list(struct service_times_element ** stl) {
 	struct service_times_element *stl_iterator, *stl_aux;
 	struct timeval current_time;
 	bool something_got_removed;
@@ -57,13 +78,13 @@ void check_neighbor_status_list(struct service_times_element * stl) {
         dprintf("LIST: check trans_id list\n");
 	
 	// Check if list is empty
-	if (stl == NULL) {
+	if (*stl == NULL) {
 		return;
 		}
         
 	// Start from the beginning of the list
-	stl_iterator = stl;
-	stl_aux = stl;
+	stl_iterator = *stl;
+	stl_aux = *stl;
 	// Iterate the list until you get the right element
 	while (stl_iterator != NULL) {
 		// If the element has been in the list for a period greater than the timeout, remove it
@@ -71,24 +92,7 @@ void check_neighbor_status_list(struct service_times_element * stl) {
 		if ( (current_time.tv_sec + current_time.tv_usec*1e-6 - stl_iterator->st.offer_sent_time) > TRANS_ID_MAX_LIFETIME) {
 			 dprintf("LIST TIMEOUT: trans_id %d, offer_sent_time %f, accept_received_time %f\n", stl_iterator->st.trans_id, (double) ((current_time.tv_sec + current_time.tv_usec*1e-6) - stl_iterator->st.offer_sent_time  ), (double) ((current_time.tv_sec + current_time.tv_usec*1e-6) - stl_iterator->st.accept_received_time));
 			 //fprintf(stderr, "LIST TIMEOUT: trans_id %d, offer_sent_time %f, accept_received_time %f\n", stl_iterator->st.trans_id, (double) ((current_time.tv_sec + current_time.tv_usec*1e-6) - stl_iterator->st.offer_sent_time  ), (double) ((current_time.tv_sec + current_time.tv_usec*1e-6) - stl_iterator->st.accept_received_time));
-			// If it is the first element
-			if (stl_iterator->backward == NULL) {
-				stl = stl_iterator->forward;
-				// Check if I have more than one element in the list
-				if (stl_iterator->forward != NULL)
-					stl_iterator->forward->backward = NULL;
-				stl_iterator->forward = NULL;				
-				}
-			else { 	// I have to remove the last element of the list
-				if (stl_iterator->forward == NULL) {
-					stl_iterator->backward->forward = NULL;
-					}
-				// I have to remove an element in the middle
-				else {
-					stl_iterator->backward->forward = stl_iterator->forward;
-					stl_iterator->forward->backward = stl_iterator->backward;
-					}
-				}
+		_transaction_remove(stl, stl_iterator);
 			something_got_removed = true;
 #ifndef MONL
 			timeout_reception_measure(stl_iterator->st.id);
@@ -96,7 +100,6 @@ void check_neighbor_status_list(struct service_times_element * stl) {
 
 			stl_aux = stl_iterator->forward;
 			// Free the memory
-			free(stl_iterator);
 			}
 		if (something_got_removed) {
 			stl_iterator = stl_aux;
@@ -110,7 +113,7 @@ void check_neighbor_status_list(struct service_times_element * stl) {
 
 // register the moment when a transaction is started
 // return a  new transaction id
-uint16_t transaction_create(struct service_times_element * stl, struct nodeID *id)
+uint16_t transaction_create(struct service_times_element ** stl, struct nodeID *id)
 {
 	static uint16_t trans_id = 1;
 
@@ -132,17 +135,21 @@ uint16_t transaction_create(struct service_times_element * stl, struct nodeID *i
 	stl2->st.offer_sent_time = current_time.tv_sec + current_time.tv_usec*1e-6;
 	stl2->st.accept_received_time = -1.0;
 	stl2->st.id = id;	//TODO: nodeid_dup
+
+	dprintf("LIST: adding trans_id %d to the list, offer_sent_time %f -- LIST IS NOT EMPTY\n", trans_id, (current_time.tv_sec + current_time.tv_usec*1e-6));
+
 	stl2->backward = NULL;
-	if (stl != NULL) {	//List is not empty
-		dprintf("LIST: adding trans_id %d to the list, offer_sent_time %f -- LIST IS NOT EMPTY\n", trans_id, (current_time.tv_sec + current_time.tv_usec*1e-6));
-		stl2->forward = stl;
-		stl->backward = stl2;
-		stl = stl2; 
-	} else { // This is the first element to insert
-		dprintf("LIST: adding trans_id %d to the list, offer_sent_time %f -- LIST IS EMPTY\n", trans_id, current_time.tv_sec + current_time.tv_usec*1e-6);
+
+	if (*stl)
+	{
+		(*stl)->backward = stl2;
+		stl2->forward = (*stl);
+		*stl = stl2;
+	} else {
 		stl2->forward = NULL;
-		stl = stl2; 
+		*stl = stl2;
 	}
+
 	return trans_id;
 }
 
@@ -177,14 +184,14 @@ bool transaction_reg_accept(struct service_times_element * stl, uint16_t trans_i
 // Used to get the time elapsed from the moment I get a positive select to the moment i get the ACK
 // related to the same chunk
 // it return -1.0 in case no trans_id is found
-double transaction_remove(struct service_times_element * stl, uint16_t trans_id) {
+double transaction_remove(struct service_times_element ** stl, uint16_t trans_id) {
 	struct service_times_element *stl_iterator;
 	double to_return;
 
     dprintf("LIST: deleting trans_id %d\n", trans_id);
 
 	// Start from the beginning of the list
-	stl_iterator = stl;
+	stl_iterator = *stl;
 	// Iterate the list until you get the right element
 	while (stl_iterator != NULL) {
 		if (stl_iterator->st.trans_id == trans_id)
@@ -204,43 +211,16 @@ double transaction_remove(struct service_times_element * stl, uint16_t trans_id)
 
 	to_return = stl_iterator->st.accept_received_time;
 
-	// I have to remove the element from the list
-	// If it is the first element
-	if (stl_iterator->backward == NULL) {
-		stl = stl_iterator->forward;
-		// Check if I have more than one element in the list
-		if (stl_iterator->forward != NULL)
-			stl_iterator->forward->backward = NULL;
-		stl_iterator->forward = NULL;
-		}
-	// I have to remove the last element of the list
-	else {
-		if (stl_iterator->forward == NULL) {
-			stl_iterator->backward->forward = NULL;
-			}
-		// I have to remove an element in the middle
-		else {
-			stl_iterator->backward->forward = stl_iterator->forward;
-			stl_iterator->forward->backward = stl_iterator->backward;
-			}
-		}
-	free(stl_iterator);
-	// Remove RTT measure from queue delay
-// 	if (hrc_enabled() && (to_return.accept_received_time > 0.0 && get_measure(to_return.id, 1, MIN) > 0.0 && get_measure(to_return.id, 1, MIN) != NAN))
-// 		return (to_return.accept_received_time - get_measure(to_return.id, 1, MIN));
+	_transaction_remove(stl, stl_iterator);
 
 	return to_return;
 }
 
 void transactions_destroy(struct service_times_element * head)
 {
-	struct service_times_element * iter;
-
-	iter = head;
-	while(iter != NULL)
+	while(head)
 	{
-		iter = iter->forward;
-		free(iter);
+		_transaction_remove(&head, head);
 		// in case of nodeid_dup we should free that as well
 	}
 

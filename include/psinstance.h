@@ -38,7 +38,7 @@ void psinstance_destroy(struct psinstance ** ps);
 int psinstance_poll(struct psinstance *ps, suseconds_t);
 
 /********************Additional Interface***********************/
-int8_t psinstance_send_offer(const struct psinstance * ps);
+int8_t psinstance_send_offer(struct psinstance * ps);
 
 int8_t psinstance_inject_chunk(struct psinstance * ps);
 

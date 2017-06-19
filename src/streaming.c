@@ -693,7 +693,7 @@ struct chunkID_set *compose_offer_cset(const struct streaming_context * stc, con
 }
 
 
-void send_offer(const struct streaming_context * stc)
+void send_offer(struct streaming_context * stc)
 {
   struct chunk *buff;
   size_t size=0,  i, n;
@@ -725,7 +725,7 @@ void send_offer(const struct streaming_context * stc)
     selectPeersForChunks(SCHED_WEIGHTING, nodeids, n, chunkids, size, selectedpeers, &selectedpeers_len, SCHED_NEEDS, SCHED_PEER);
 
     for (i=0; i<selectedpeers_len ; i++){
-      int transid = transaction_create(stc->transactions, selectedpeers[i]->id);
+      int transid = transaction_create(&(stc->transactions), selectedpeers[i]->id);
       int max_deliver = offer_max_deliver(stc, selectedpeers[i]->id);
       struct chunkID_set *offer_cset = compose_offer_cset(stc, selectedpeers[i]);
       dprintf("\t sending offer(%d) to %s, cb_size: %d\n", transid, nodeid_static_str(selectedpeers[i]->id), selectedpeers[i]->cb_size);
@@ -815,7 +815,7 @@ void log_signal(const struct nodeID *fromid,const struct nodeID *toid,const int 
 	fprintf(stderr,"[OFFER_LOG],%s,%s,%d,%s,%s\n",sndr,rcvr,trans_id,typestr,flag);
 }
 
-int peer_chunk_dispatch(const struct streaming_context * stc, const struct PeerChunk  *pairs,const size_t num_pairs)
+int peer_chunk_dispatch(struct streaming_context * stc, const struct PeerChunk  *pairs,const size_t num_pairs)
 {
 	int transid, res,success = 0;
 	size_t i;
@@ -830,7 +830,7 @@ int peer_chunk_dispatch(const struct streaming_context * stc, const struct PeerC
 			send_bmap(stc, target_peer->id);
 		}
 		chunk_attributes_update_sending(target_chunk);
-		transid = transaction_create(stc->transactions, target_peer->id);
+		transid = transaction_create(&(stc->transactions), target_peer->id);
 		res = sendChunk(target_peer->id, target_chunk, transid);	//we use transactions in order to register acks for push
 		if (res>=0) {
 #ifdef LOG_CHUNK
@@ -847,7 +847,7 @@ int peer_chunk_dispatch(const struct streaming_context * stc, const struct PeerC
 
 }
 
-int inject_chunk(const struct streaming_context * stc, const struct chunk * target_chunk,const int multiplicity)
+int inject_chunk(struct streaming_context * stc, const struct chunk * target_chunk,const int multiplicity)
 /*injects a specific chunk in the overlay and return the number of injected copies*/
 {
 	struct peerset *pset;
@@ -880,7 +880,7 @@ int inject_chunk(const struct streaming_context * stc, const struct chunk * targ
 	return selectedpairs_len;
 }
 
-void send_chunk(const struct streaming_context * stc)
+void send_chunk(struct streaming_context * stc)
 {
   struct chunk *buff;
   int size, res, i, n;
@@ -925,7 +925,7 @@ void send_chunk(const struct streaming_context * stc)
       }
 
       chunk_attributes_update_sending(c);
-      transid = transaction_create(stc->transactions, p->id);
+      transid = transaction_create(&(stc->transactions), p->id);
       res = sendChunk(p->id, c, transid);	//we use transactions in order to register acks for push
 //      res = sendChunk(p->id, c, 0);	//we do not use transactions in pure push
       dprintf("\tResult: %d\n", res);

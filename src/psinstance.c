@@ -208,7 +208,7 @@ const struct streaming_context * psinstance_streaming(const struct psinstance * 
 	return ps->streaming;
 }
 
-int8_t psinstance_send_offer(const struct psinstance * ps)
+int8_t psinstance_send_offer(struct psinstance * ps)
 {
 	send_offer(ps->streaming);
 	return 0;
