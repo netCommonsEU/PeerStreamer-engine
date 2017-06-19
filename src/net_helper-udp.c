@@ -216,6 +216,7 @@ struct nodeID *create_node(const char *IPaddr, int port)
   if ((res = getaddrinfo(IPaddr, NULL, &hints, &result)))
   {
     fprintf(stderr, "Cannot resolve hostname '%s'\n", IPaddr);
+    free(s);
     return NULL;
   }
   s->addr.ss_family = result->ai_family;
