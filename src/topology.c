@@ -116,7 +116,7 @@ int topology_init(struct topology * t, const struct psinstance * ps, const char 
 	t->topo_mem = 0.7;
 	t->topo_out = true; //peer selects out-neighbours
 	t->topo_in = true; //peer selects in-neighbours (combined means bidirectional)
-	grapes_config_value_int_default(tags, "neighbourhood_size", &(t->neighbourhood_target_size), 30);
+	grapes_config_value_int_default(tags, "neighbourhood_size", &(t->neighbourhood_target_size), DEFAULT_PEER_NEIGH_SIZE);
 
 	update_metadata(t);
 	t->tc = psample_init(psinstance_nodeid(ps), &(t->my_metadata), sizeof(struct metadata), config);

@@ -38,7 +38,7 @@ int8_t psinstance_send_offer(const struct psinstance * ps);
 
 int8_t psinstance_inject_chunk(struct psinstance * ps);
 
-int8_t psinstance_handle_msg(const struct psinstance * ps);
+int8_t psinstance_handle_msg(struct psinstance * ps);
 
 int8_t psinstance_topology_update(const struct psinstance * ps);
 

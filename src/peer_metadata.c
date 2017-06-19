@@ -31,3 +31,10 @@ uint16_t peer_cb_size(const struct peer *p)
 		return ((struct metadata *)p->metadata)->cb_size;
 	return DEFAULT_PEER_CBSIZE;
 }
+
+uint16_t peer_neigh_size(const struct peer *p)
+{
+	if (p && p->metadata)
+		return ((struct metadata *)p->metadata)->neigh_size;
+	return DEFAULT_PEER_NEIGH_SIZE;
+}

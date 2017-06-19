@@ -233,7 +233,7 @@ int8_t psinstance_inject_chunk(struct psinstance * ps)
 	return res;
 }
 
-int8_t psinstance_handle_msg(const struct psinstance * ps)
+int8_t psinstance_handle_msg(struct psinstance * ps)
 	/* WARNING: this is a blocking function on the network socket */
 {
 	uint8_t buff[MSG_BUFFSIZE];
@@ -261,6 +261,7 @@ int8_t psinstance_handle_msg(const struct psinstance * ps)
 				else
 					received_chunk(ps->streaming, remote, buff, len);
 				res = 2;
+				ps->chunk_offer_interval = chunk_interval_measure(ps->measure);
 				break;
 			case MSG_TYPE_SIGNALLING:
 				dtprintf("Sign message received:\n");

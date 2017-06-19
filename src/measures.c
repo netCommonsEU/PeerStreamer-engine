@@ -21,14 +21,32 @@
 #include<measures.h>
 #include<string.h>
 
+#define DEFAULT_CHUNK_INTERVAL (1000000/25)
+
+enum data_state {deinit, loading, ready};
+
+struct chunk_interval_estimate {
+	uint32_t first_index;
+	uint64_t first_timestamp;
+	suseconds_t chunk_interval;
+	enum data_state state;
+};
+
 struct measures {
 	char * filename;
+	struct chunk_interval_estimate cie;
 };
+
+void chunk_interval_estimate_init(struct chunk_interval_estimate * cie)
+{
+	cie->state = deinit;
+}
 
 struct measures * measures_create(const char * filename)
 {
 	struct measures * m;
 	m = malloc(sizeof(struct measures));
+	chunk_interval_estimate_init(&(m->cie));
 	return m;
 }
 
@@ -67,6 +85,22 @@ int8_t reg_offer_accept_in(struct measures * m, uint8_t t)
 
 int8_t reg_chunk_receive(struct measures * m, int cid, uint64_t ctimestamp, int hopcount, int8_t old, int8_t duplicate)
 { 
+	if (!duplicate)  // chunk interval estimation
+	{
+		switch (m->cie.state) {
+			case deinit:
+				m->cie.first_index = cid;
+				m->cie.first_timestamp = ctimestamp;
+				m->cie.state = loading;
+				break;
+			case loading:
+			case ready:
+				if (cid > m->cie.first_index)
+					m->cie.chunk_interval = ((ctimestamp - m->cie.first_timestamp))/(cid - m->cie.first_index);
+				m->cie.state = ready;
+				break;
+		}
+	}
 	return 0;
 }
 
@@ -95,3 +129,9 @@ int8_t reception_measure(const struct nodeID * id)
 	return 0;
 }
 
+suseconds_t chunk_interval_measure(const struct measures *m)
+{
+	if (m->cie.state == ready)
+		return m->cie.chunk_interval;
+	return DEFAULT_CHUNK_INTERVAL;
+}
