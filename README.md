@@ -25,7 +25,7 @@ $> CFLAGS="-DLOG_CHUNK -DLOG_SIGNAL" make
 ## Test
 In the "test" folder are stored the test files. To run them and check code consistency run:
 ``
-$> cd test/ && make && ./run_tests.sh
+$> make tests
 ``
 
 ## Example

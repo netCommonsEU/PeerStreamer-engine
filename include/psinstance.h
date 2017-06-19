@@ -30,10 +30,14 @@ typedef long suseconds_t;
 
 struct psinstance;
 
+/********************High-level Interface***********************/
 struct psinstance * psinstance_create(const char * srv_ip, const int srv_port, const char * config);
 
 void psinstance_destroy(struct psinstance ** ps);
 
+int psinstance_poll(struct psinstance *ps, suseconds_t);
+
+/********************Additional Interface***********************/
 int8_t psinstance_send_offer(const struct psinstance * ps);
 
 int8_t psinstance_inject_chunk(struct psinstance * ps);
@@ -43,7 +47,5 @@ int8_t psinstance_handle_msg(const struct psinstance * ps);
 int8_t psinstance_topology_update(const struct psinstance * ps);
 
 suseconds_t psinstance_offer_interval(const struct psinstance * ps);
-
-int psinstance_poll(struct psinstance *ps, suseconds_t);
 
 #endif
