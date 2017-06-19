@@ -30,6 +30,7 @@
 #include <peersampler.h>
 #include <peer.h>
 #include <grapes_msg_types.h>
+#include<grapes_config.h>
 //
 #include "compatibility/timer.h"
 //
@@ -38,31 +39,22 @@
 #include "dbg.h"
 #include "measures.h"
 #include "streaming.h"
+#include "peer_metadata.h"
 
 #define MAX(A,B) (((A) > (B)) ? (A) : (B))
 #define NEIGHBOURHOOD_ADD 0
 #define NEIGHBOURHOOD_REMOVE 1
-#define DEFAULT_PEER_CBSIZE 50
 
 #ifndef NAN	//NAN is missing in some old math.h versions
 #define NAN            (0.0/0.0)
 #endif
 
-struct metadata {
-  uint16_t cb_size;
-} __attribute__((packed));
-
 enum peer_choice {PEER_CHOICE_RANDOM, PEER_CHOICE_BEST, PEER_CHOICE_WORST};
 
 struct topology {
-	double desired_bw;
-	double desired_rtt;
-	double alpha_target;
 	double topo_mem;
 	bool topo_out;
 	bool topo_in;
-	bool topo_keep_best;
-	bool topo_add_best;
 	int neighbourhood_target_size;
 	struct timeval tout_bmap;
 	struct metadata my_metadata;	
@@ -91,7 +83,9 @@ void peerset_print(const struct peerset * pset, const char * name)
 
 void update_metadata(struct topology * t)
 {
-	t->my_metadata.cb_size = psinstance_is_source(t->ps) ? 0 : psinstance_chunkbuffer_size(t->ps);
+	metadata_update(&(t->my_metadata), 
+			psinstance_is_source(t->ps) ? 0 : psinstance_chunkbuffer_size(t->ps),
+			peerset_size(t->neighbourhood));
 }
 
 struct peer * topology_get_peer(struct topology * t, const struct nodeID * id)
@@ -105,6 +99,10 @@ struct peer * topology_get_peer(struct topology * t, const struct nodeID * id)
 
 int topology_init(struct topology * t, const struct psinstance * ps, const char *config)
 {
+	struct tag * tags;
+
+	tags = grapes_config_parse(config);
+
 	bind_msg_type(MSG_TYPE_NEIGHBOURHOOD);
 	bind_msg_type(MSG_TYPE_TOPOLOGY);
 	t->tout_bmap.tv_sec = 20;
@@ -115,20 +113,15 @@ int topology_init(struct topology * t, const struct psinstance * ps, const char 
 	t->swarm_bucket = peerset_init(0);
 	t->locked_neighs = peerset_init(0);
 
-	t->desired_bw = 0;	//TODO: turn on capacity measurement and set meaningful default value
-	t->desired_rtt = 0.2;
-	t->alpha_target = 0.4;
 	t->topo_mem = 0.7;
 	t->topo_out = true; //peer selects out-neighbours
 	t->topo_in = true; //peer selects in-neighbours (combined means bidirectional)
-	t->topo_keep_best = false;
-	t->topo_add_best = false;
-	t->neighbourhood_target_size = 30;
+	grapes_config_value_int_default(tags, "neighbourhood_size", &(t->neighbourhood_target_size), 30);
 
 	update_metadata(t);
 	t->tc = psample_init(psinstance_nodeid(ps), &(t->my_metadata), sizeof(struct metadata), config);
 	
-  //fprintf(stderr,"[DEBUG] done with topology init\n");
+	free(tags);
 	return t->tc && t->neighbourhood && t->swarm_bucket ? 1 : 0;
 }
 
@@ -149,21 +142,6 @@ int topology_node_insert(struct topology * t, struct nodeID *id)
 	return psample_add_peer(t->tc,id,&m,sizeof(m));
 }
 
-void topology_peer_set_metadata(struct  peer *p, const struct metadata *m)
-{
-	if (p)
-	{
-		if (m)
-		{
-			p->cb_size = m->cb_size;
-		}
-		else
-		{
-			p->cb_size = DEFAULT_PEER_CBSIZE;
-		}
-
-	}
-}
 
 struct peer * neighbourhood_add_peer(struct topology * t, const struct nodeID *id)
 {
@@ -211,7 +189,7 @@ void neighbourhood_message_parse(struct topology * t, struct nodeID *from, const
 			if (len >= (sizeof(struct metadata) + 1))
 			{
 				memmove(&m,buff+1,sizeof(struct metadata));
-				topology_peer_set_metadata(p,&m);
+				peer_set_metadata(p,&m);
 			}
 			break;
 
@@ -264,7 +242,7 @@ void topology_sample_peers(struct topology * t)
 		}
 		else
 			//fprintf(stderr,"[DEBUG] OLD PEER!\n");
-		topology_peer_set_metadata(p,&(sample_metas[i]));	
+		peer_set_metadata(p,&(sample_metas[i]));	
 	}
 }
 
@@ -311,11 +289,6 @@ double get_rtt_of(struct topology *t, const struct nodeID* n){
 }
 
 double get_capacity_of(struct topology *t, const struct nodeID* n){
-  struct peer *p = topology_get_peer(t, n);
-  if (p) {
-    return p->capacity;
-  }
-
   return NAN;
 }
 
@@ -388,7 +361,6 @@ void topology_move_peers(struct peerset * pset1, struct peerset * pset2,int num,
 		memmove(peers,const_peers,peers_num*sizeof(struct peer*));
 
 	if (criterion != PEER_CHOICE_RANDOM && cmp_peer != NULL) {
-    //fprintf(stderr,"[DEBUG] choosen the qsort\n");
 		qsort(peers, peers_num, sizeof(struct peer*), cmp_peer);
 	} else {
     array_shuffle(peers, peers_num, sizeof(struct peer *));
@@ -489,4 +461,8 @@ void topology_destroy(struct topology **t)
 			psample_destroy(&((*t)->tc));
 		free(*t);
 	}
+}
+
+uint8_t topology_peer_cbsize(const struct topology *t, const struct peer * p)
+{
 }

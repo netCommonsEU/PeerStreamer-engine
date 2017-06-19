@@ -54,6 +54,7 @@
 #include "net_helpers.h"
 #include "scheduling.h"
 #include "transaction.h"
+#include "peer_metadata.h"
 
 #include "scheduler_la.h"
 
@@ -478,7 +479,7 @@ int needs_old(const struct streaming_context * stc, struct peer *n, int cid){
 //	fprintf(stderr,"[DEBUG] Evaluating Peer %s, CB_SIZE: %d\n",node_addr_tr(n->id),p->cb_size); // DEBUG
 //	print_chunkID_set(p->bmap);																					// DEBUG
 
-  return _needs(stc, p->bmap, p->cb_size, cid);
+  return _needs(stc, p->bmap, peer_cb_size(p), cid);
 }
 
 /**
@@ -525,13 +526,13 @@ int needs(struct peer *p, int cid)
 {
 	int min;
 
-	if (p->cb_size == 0) // it does not have capacity
+	if (peer_cb_size(p) == 0) // it does not have capacity
 		return 0;
 	if (chunkID_set_check(p->bmap,cid) < 0)  // not in bmap
 	{
-		if(p->cb_size > chunkID_set_size(p->bmap)) // it has room for chunks anyway
+		if(peer_cb_size(p) > chunkID_set_size(p->bmap)) // it has room for chunks anyway
 		{
-			min = chunkID_set_get_earliest(p->bmap) - p->cb_size + chunkID_set_size(p->bmap);
+			min = chunkID_set_get_earliest(p->bmap) - peer_cb_size(p) + chunkID_set_size(p->bmap);
 			min = min < 0 ? 0 : min;
 			if (cid >= min)
 				return 1;
@@ -728,7 +729,7 @@ void send_offer(const struct streaming_context * stc)
       int transid = transaction_create(stc->transactions, selectedpeers[i]->id);
       int max_deliver = offer_max_deliver(stc, selectedpeers[i]->id);
       struct chunkID_set *offer_cset = compose_offer_cset(stc, selectedpeers[i]);
-      dprintf("\t sending offer(%d) to %s, cb_size: %d\n", transid, nodeid_static_str(selectedpeers[i]->id), selectedpeers[i]->cb_size);
+      dprintf("\t sending offer(%d) to %s, cb_size: %d\n", transid, nodeid_static_str(selectedpeers[i]->id), peer_cb_size(selectedpeers[i]));
       offerChunks(selectedpeers[i]->id, offer_cset, max_deliver, transid++);
 #ifdef LOG_SIGNAL
 			log_signal(psinstance_nodeid(stc->ps),selectedpeers[i]->id,chunkID_set_size(offer_cset),transid,sig_offer,"SENT");

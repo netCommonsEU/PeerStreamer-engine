@@ -62,7 +62,7 @@ void ack_received(const struct psinstance * ps, struct nodeID *fromid, struct ch
   // rc_reg_ack(trans_id);
 }
 
-void bmap_received(const struct psinstance * ps, struct nodeID *fromid, struct nodeID *ownerid, struct chunkID_set *c_set, int cb_size, uint16_t trans_id) {
+void bmap_received(const struct psinstance * ps, struct nodeID *fromid, struct nodeID *ownerid, struct chunkID_set *c_set, int maxdeliver, uint16_t trans_id) {
   struct peer *owner;
   if (nodeid_equal(fromid, ownerid)) {
     owner = nodeid_to_peer(psinstance_topology(ps), ownerid, neigh_on_sign_recv);
@@ -75,7 +75,6 @@ void bmap_received(const struct psinstance * ps, struct nodeID *fromid, struct n
   if (owner) {	//now we have it almost sure
     chunkID_set_clear(owner->bmap,0);	//TODO: some better solution might be needed to keep info about chunks we sent in flight.
     chunkID_set_union(owner->bmap,c_set);
-    owner->cb_size = cb_size;
     gettimeofday(&owner->bmap_timestamp, NULL);
   }
 }
@@ -149,7 +148,7 @@ int sigParseData(const struct psinstance * ps, struct nodeID *fromid, uint8_t *b
     }
     switch (sig_type) {
         case sig_send_buffermap:
-          bmap_received(ps, fromid, ownerid, c_set, max_deliver, trans_id); //FIXME: cb_size has gone from signaling
+          bmap_received(ps, fromid, ownerid, c_set, max_deliver, trans_id); 
           break;
         case sig_offer:
           offer_received(ps, fromid, c_set, max_deliver, trans_id);
