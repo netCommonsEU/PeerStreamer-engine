@@ -115,7 +115,7 @@ void streaming_destroy(struct streaming_context ** stc)
 		if(((*stc)->ch_locks))
 			chunk_locks_destroy(&((*stc)->ch_locks));
 		if(((*stc)->transactions))
-			transactions_destroy((*stc)->transactions);
+			transaction_destroy(&((*stc)->transactions));
 		if(((*stc)->cb))
 			cb_destroy((*stc)->cb);
 		free((*stc));

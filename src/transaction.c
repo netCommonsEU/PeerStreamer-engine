@@ -63,6 +63,7 @@ void _transaction_remove(struct service_times_element ** head, struct service_ti
 			stl->forward->backward = stl->backward;
 		}
 	}
+	nodeid_free(stl->st.id);
 	free(stl);
 }	
 
@@ -112,45 +113,43 @@ void check_neighbor_status_list(struct service_times_element ** stl) {
 }
 
 // register the moment when a transaction is started
-// return a  new transaction id
+// return a  new transaction id or 0 in case of failure
 uint16_t transaction_create(struct service_times_element ** stl, struct nodeID *id)
 {
-	static uint16_t trans_id = 1;
-
 	struct service_times_element *stl2;
 	struct timeval current_time;
 
-	check_neighbor_status_list(stl);
-
-	gettimeofday(&current_time, NULL);
-
-	//create new trans_id;
-	trans_id++;
-	//skip 0
-	if (!trans_id) trans_id++;
-
-	// create a new element in the list with its offer_sent_time and set accept_received_time to -1.0
-	stl2 = (struct service_times_element*) malloc(sizeof(struct service_times_element));
-	stl2->st.trans_id = trans_id;
-	stl2->st.offer_sent_time = current_time.tv_sec + current_time.tv_usec*1e-6;
-	stl2->st.accept_received_time = -1.0;
-	stl2->st.id = id;	//TODO: nodeid_dup
-
-	dprintf("LIST: adding trans_id %d to the list, offer_sent_time %f -- LIST IS NOT EMPTY\n", trans_id, (current_time.tv_sec + current_time.tv_usec*1e-6));
-
-	stl2->backward = NULL;
-
-	if (*stl)
+	if (stl && id)
 	{
-		(*stl)->backward = stl2;
-		stl2->forward = (*stl);
-		*stl = stl2;
-	} else {
-		stl2->forward = NULL;
-		*stl = stl2;
-	}
+		check_neighbor_status_list(stl);
 
-	return trans_id;
+		gettimeofday(&current_time, NULL);
+
+
+		// create a new element in the list with its offer_sent_time and set accept_received_time to -1.0
+		stl2 = (struct service_times_element*) malloc(sizeof(struct service_times_element));
+		stl2->st.offer_sent_time = current_time.tv_sec + current_time.tv_usec*1e-6;
+		stl2->st.accept_received_time = -1.0;
+		stl2->st.id = nodeid_dup(id);
+
+		stl2->backward = NULL;
+
+		if (*stl)
+		{
+			stl2->st.trans_id = (*stl)->st.trans_id + 1 ? (*stl)->st.trans_id + 1 : 1;
+			(*stl)->backward = stl2;
+			stl2->forward = (*stl);
+			*stl = stl2;
+		} else {
+			stl2->st.trans_id = 1;
+			stl2->forward = NULL;
+			*stl = stl2;
+		}
+		dprintf("LIST: adding trans_id %d to the list, offer_sent_time %f -- LIST IS NOT EMPTY\n", stl2->st.trans_id, (current_time.tv_sec + current_time.tv_usec*1e-6));
+
+		return stl2->st.trans_id;
+	}
+	return 0;
 }
 
 
@@ -161,22 +160,25 @@ bool transaction_reg_accept(struct service_times_element * stl, uint16_t trans_i
 	struct service_times_element *stl_iterator;
 	struct timeval current_time;
 
-	gettimeofday(&current_time, NULL);
-	stl_iterator = stl;
+	if (stl && id && trans_id)
+	{
+		gettimeofday(&current_time, NULL);
+		stl_iterator = stl;
 
-	// if an accept was received, look for the trans_id and add current_time to accept_received_time field
-	dprintf("LIST: changing trans_id %d to the list, accept received %f\n", trans_id, current_time.tv_sec + current_time.tv_usec*1e-6);
-	// Iterate the list until you get the right element
-	while (stl_iterator != NULL) {
-			if (stl_iterator->st.trans_id == trans_id) {
-				stl_iterator->st.accept_received_time = current_time.tv_sec + current_time.tv_usec*1e-6;
-#ifndef MONL
-				offer_accept_rtt_measure(id,stl_iterator->st.accept_received_time - stl_iterator->st.offer_sent_time);
-				reception_measure(id);
-#endif
-				return true;
-				}
-			stl_iterator = stl_iterator->forward;
+		// if an accept was received, look for the trans_id and add current_time to accept_received_time field
+		dprintf("LIST: changing trans_id %d to the list, accept received %f\n", trans_id, current_time.tv_sec + current_time.tv_usec*1e-6);
+		// Iterate the list until you get the right element
+		while (stl_iterator != NULL) {
+				if (stl_iterator->st.trans_id == trans_id) {
+					stl_iterator->st.accept_received_time = current_time.tv_sec + current_time.tv_usec*1e-6;
+	#ifndef MONL
+					offer_accept_rtt_measure(id,stl_iterator->st.accept_received_time - stl_iterator->st.offer_sent_time);
+					reception_measure(id);
+	#endif
+					return true;
+					}
+				stl_iterator = stl_iterator->forward;
+		}
 	}
 	return false;
 }
@@ -216,11 +218,11 @@ double transaction_remove(struct service_times_element ** stl, uint16_t trans_id
 	return to_return;
 }
 
-void transactions_destroy(struct service_times_element * head)
+void transaction_destroy(struct service_times_element ** head)
 {
-	while(head)
+	while(*head)
 	{
-		_transaction_remove(&head, head);
+		_transaction_remove(head, *head);
 		// in case of nodeid_dup we should free that as well
 	}
 

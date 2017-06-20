@@ -7,7 +7,7 @@ TARGET=../src/libpstreamer.a
 TARGET_SRC=$(wildcard ../src/*.c)
 GRAPESLIB=$(GRAPES)/src/libgrapes.a
 
-CFLAGS += -g -W -Wall -I ../include
+CFLAGS += -g -W -Wall -I ../include -I../src -I$(GRAPES)/include
 LDFLAGS += -l pstreamer -L ../src -lgrapes -L $(GRAPES)/src
 
 all: $(OBJS)

@@ -44,6 +44,6 @@ bool transaction_reg_accept(struct service_times_element * head, uint16_t trans_
 // it return -1.0 in case no trans_id is found
 double transaction_remove(struct service_times_element ** head, uint16_t trans_id);
 
-void transactions_destroy(struct service_times_element * head);
+void transaction_destroy(struct service_times_element ** head);
 
 #endif // TRANSACTION_H
