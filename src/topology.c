@@ -258,12 +258,9 @@ void topology_sample_peers(struct topology * t)
 		p = topology_get_peer(t, sample_nodes[i]);
 		if(p==NULL)
 		{
-			//fprintf(stderr,"[DEBUG] NEW PEER!\n");
 			peerset_add_peer(t->swarm_bucket,sample_nodes[i]);
 			p = topology_get_peer(t, sample_nodes[i]);
 		}
-		else
-			//fprintf(stderr,"[DEBUG] OLD PEER!\n");
 		topology_peer_set_metadata(p,&(sample_metas[i]));	
 	}
 }
@@ -284,10 +281,10 @@ void neighbourhood_drop_unactives(struct topology * t, struct timeval * bmap_tim
     if ( (!timerisset(&peers[i]->bmap_timestamp) && timercmp(&peers[i]->creation_timestamp, &told, <) ) ||
          ( timerisset(&peers[i]->bmap_timestamp) && timercmp(&peers[i]->bmap_timestamp, &told, <)     )   ) {
       dprintf("Topo: dropping inactive %s (peersset_size: %d)\n", nodeid_static_str(peers[i]->id), peerset_size(t->neighbourhood));
-      //if (peerset_size(t->neighbourhood) > 1) {	// avoid dropping our last link to the world
-      topology_blacklist_add(t, peers[i]->id);
-      neighbourhood_remove_peer(t, peers[i]->id);
-      //}
+      if (peerset_size(t->neighbourhood) > 1) {	// avoid dropping our last link to the world
+	      topology_blacklist_add(t, peers[i]->id);
+	      neighbourhood_remove_peer(t, peers[i]->id);
+      }
     }
   }
 	
