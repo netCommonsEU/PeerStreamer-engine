@@ -261,7 +261,6 @@ int8_t psinstance_handle_msg(struct psinstance * ps)
 				else
 					received_chunk(ps->streaming, remote, buff, len);
 				res = 2;
-				ps->chunk_offer_interval = chunk_interval_measure(ps->measure);
 				break;
 			case MSG_TYPE_SIGNALLING:
 				dtprintf("Sign message received:\n");
@@ -272,6 +271,7 @@ int8_t psinstance_handle_msg(struct psinstance * ps)
 				fprintf(stderr, "Unknown Message Type %x\n", buff[0]);
 				res = -2;
 		}
+		ps->chunk_offer_interval = streaming_offer_interval(ps->streaming);
 
 	if (remote)
 		nodeid_free(remote);

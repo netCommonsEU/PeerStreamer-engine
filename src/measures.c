@@ -27,6 +27,7 @@ enum data_state {deinit, loading, ready};
 
 struct chunk_interval_estimate {
 	uint32_t first_index;
+	uint32_t last_index;
 	uint64_t first_timestamp;
 	suseconds_t chunk_interval;
 	enum data_state state;
@@ -90,13 +91,17 @@ int8_t reg_chunk_receive(struct measures * m, int cid, uint64_t ctimestamp, int 
 		switch (m->cie.state) {
 			case deinit:
 				m->cie.first_index = cid;
+				m->cie.last_index = cid;
 				m->cie.first_timestamp = ctimestamp;
 				m->cie.state = loading;
 				break;
 			case loading:
 			case ready:
-				if (cid > (int64_t)m->cie.first_index)
+				if (cid > (int64_t)m->cie.last_index)
+				{
 					m->cie.chunk_interval = ((ctimestamp - m->cie.first_timestamp))/(cid - m->cie.first_index);
+					m->cie.last_index = cid;
+				}
 				m->cie.state = ready;
 				break;
 		}

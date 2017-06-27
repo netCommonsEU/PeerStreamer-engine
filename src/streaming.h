@@ -60,4 +60,6 @@ struct streaming_context * streaming_create(const struct psinstance * ps, struct
 
 void streaming_destroy(struct streaming_context ** stc);
 
+suseconds_t streaming_offer_interval(const struct streaming_context *stc);
+
 #endif	/* STREAMING_H */
