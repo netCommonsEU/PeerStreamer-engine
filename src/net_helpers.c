@@ -42,9 +42,8 @@
 #include <string.h>
 
 #include "net_helpers.h"
-extern enum L3PROTOCOL {IPv4, IPv6} l3;
 
-char *iface_addr(const char *iface)
+char *iface_addr(const char *iface, enum L3PROTOCOL l3)
 {
 #ifndef _WIN32
     struct ifaddrs *if_addr, *ifap;
@@ -66,7 +65,7 @@ char *iface_addr(const char *iface)
 			continue;
 		}
 		family = ifap->ifa_addr->sa_family;
-		if (l3 == IPv4 && family == AF_INET && !strcmp (ifap->ifa_name, iface))
+		if (l3 == IP4 && family == AF_INET && !strcmp (ifap->ifa_name, iface))
 		{
 			host_addr = malloc((size_t)INET_ADDRSTRLEN);
 			if (!host_addr)
@@ -82,7 +81,7 @@ char *iface_addr(const char *iface)
 			}
 			break;
 		}
-		if (l3 == IPv6 && family == AF_INET6 && !strcmp (ifap->ifa_name, iface))
+		if (l3 == IP6 && family == AF_INET6 && !strcmp (ifap->ifa_name, iface))
 		{
 			host_addr = malloc((size_t)INET6_ADDRSTRLEN);
 			if (!host_addr)
@@ -108,11 +107,11 @@ char *iface_addr(const char *iface)
     {
 	  switch (l3)
 	  {
-		case IPv4:
+		case IP4:
 			res = malloc (INET_ADDRSTRLEN);
 			strcpy(res, "127.0.0.1");
 		  break;
-		case IPv6:
+		case IP6:
 			res = malloc (INET6_ADDRSTRLEN);
 			strcpy(res, "::1");
 		  break;
@@ -195,8 +194,8 @@ const char *hostname_ip_addr()
   for (res = result; res != NULL ; res = res->ai_next)
   {
       dtprintf(stderr, "Address Family is %d...", res->ai_family);
-	  if ( (res->ai_family == AF_INET && l3 == IPv4) ||
-			  (res->ai_family == AF_INET6 && l3 == IPv6))
+	  if ( (res->ai_family == AF_INET && l3 == IP4) ||
+			  (res->ai_family == AF_INET6 && l3 == IP6))
 	  {
 		  if (res->ai_family == AF_INET)
 		  {
@@ -221,15 +220,11 @@ const char *hostname_ip_addr()
 #endif
 }
 
-char *autodetect_ip_address() {
+char *autodetect_ip_address(enum L3PROTOCOL l3) {
 #ifdef __linux__
 
-//	static char addr[128] = "";
 	char iface[IFNAMSIZ] = "";
 	char line[128] = "x";
-//	struct ifaddrs *ifaddr, *ifa;
-//	char *host_addr;
-//	int res;
 
 	FILE *r = fopen("/proc/net/route", "r");
 	if (!r) return NULL;
@@ -247,75 +242,19 @@ char *autodetect_ip_address() {
 	}
 	fclose(r);
 
-	return iface_addr(iface);
-//	if (iface[0] == 0) return NULL;
-//
-//	if (getifaddrs(&ifaddr) < 0) {
-//		perror("getifaddrs");
-//		return NULL;
-//	}
-//
-//	ifa = ifaddr;
-//	while (ifa) {
-//		if (ifa->ifa_addr && ifa->ifa_addr->sa_family == AF_INET &&
-//			ifa->ifa_name && !strcmp(ifa->ifa_name, iface))  {
-//            if (l3 == IPv4 && ifa->ifa_addr->sa_family == AF_INET)
-//            {
-//        			host_addr = malloc((size_t)INET_ADDRSTRLEN);
-//        			if (!host_addr)
-//        			{
-//        				perror("malloc host_addr");
-//        				return NULL;
-//        			}
-//        			if (!inet_ntop(ifa->ifa_addr->sa_family, (void *)&(((struct sockaddr_in *)(ifa->ifa_addr))->sin_addr), host_addr, INET_ADDRSTRLEN))
-//        			{
-//        				perror("inet_ntop");
-//        				return NULL;
-//        			}
-//        			break;
-//        		}
-//                void *tmpAddrPtr=&((struct sockaddr_in *)ifa->ifa_addr)->sin_addr;
-//
-//                res = getnameinfo(ifa->ifa_addr, sizeof(struct sockaddr_in), line, NI_MAXHOST, NULL, 0, NI_NUMERICHOST);
-//                printf("dev: %-8s address: <%s> \n", ifa->ifa_name, line);
-//                if (inet_ntop(AF_INET, tmpAddrPtr, addr, 127)) {
-//                        ret = addr;
-//                } else {
-//                        perror("inet_ntop error");
-//                        ret = NULL;
-//                }
-//                break;
-//            }
-//            if (l3 == IPv6 && ifa->ifa_addr->sa_family == AF_INET6){
-//                void *tmpAddrPtr=&((struct sockaddr_in6 *)ifa->ifa_addr)->sin6_addr;
-//                if (inet_ntop(AF_INET6, tmpAddrPtr, addr, 127)) {
-//                      ret = addr;
-//                } else {
-//                        perror("inet_ntop error");
-//                        ret = NULL;
-//                }
-//                break;
-//            }
-//			break;
-//		}
-//	ifa=ifa->ifa_next;
-//	}
-//
-//	freeifaddrs(ifaddr);
-//	return ret;
+	return iface_addr(iface, l3);
 #else
 		return hostname_ip_addr();
-//        return simple_ip_addr();
 #endif
 }
 
-char *default_ip_addr()
+char *default_ip_addr(enum L3PROTOCOL l3)
 {
   char *ip = NULL;
 
   dtprintf("Trying to guess IP ...");
 
-  ip = autodetect_ip_address();
+  ip = autodetect_ip_address(l3);
 
   if (!ip) {
     dtprintf("cannot detect IP!\n");

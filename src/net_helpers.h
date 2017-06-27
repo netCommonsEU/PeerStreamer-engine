@@ -27,8 +27,10 @@
 
 #define NODE_STR_LENGTH 80
 
-char *iface_addr(const char *iface);
-char *default_ip_addr();
+enum L3PROTOCOL {IP4, IP6};
+
+char *iface_addr(const char *iface, enum L3PROTOCOL l3);
+char *default_ip_addr(enum L3PROTOCOL l3);
 char * nodeid_static_str(const struct nodeID * id);
 int register_network_fds(const struct nodeID *s, fd_register_f func, void *handler);
 

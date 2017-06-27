@@ -53,6 +53,7 @@ struct psinstance {
 	suseconds_t chunk_time_interval; // microseconds
 	suseconds_t chunk_offer_interval; // microseconds
 	int source_multiplicity;
+	enum L3PROTOCOL l3;
 };
 
 int config_parse(struct psinstance * ps,const char * config)
@@ -68,8 +69,11 @@ int config_parse(struct psinstance * ps,const char * config)
 	grapes_config_value_int_default(tags, "outbuff_size", &(ps->outbuff_size), 75);
 	grapes_config_value_int_default(tags, "chunkbuffer_size", &(ps->chunkbuffer_size), 50);
 	grapes_config_value_int_default(tags, "source_multiplicity", &(ps->source_multiplicity), 3);
+
 	tmp_str = grapes_config_value_str_default(tags, "filename", NULL);
 	strcpy((ps->inc).filename, tmp_str ? tmp_str : "");
+	tmp_str = grapes_config_value_str_default(tags, "AF", NULL);
+	ps->l3 = tmp_str && (strcmp(tmp_str, "INET6") == 0) ? IP6 : IP4;
 
 	free(tags);
 	return 0;
@@ -80,9 +84,9 @@ int node_init(struct psinstance * ps)
 	char * my_addr;
 
 	if (ps->iface)
-		my_addr = iface_addr(ps->iface);
+		my_addr = iface_addr(ps->iface, ps->l3);
 	else
-		my_addr = default_ip_addr();
+		my_addr = default_ip_addr(ps->l3);
 	if (my_addr == NULL)
 	{
 		fprintf(stderr, "[ERROR] cannot get a valid ip address\n");
