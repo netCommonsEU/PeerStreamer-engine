@@ -12,8 +12,13 @@ $(LIBPS): $(LIBPS_SRC)
 $(LIBGRAPES):
 	$(MAKE) -C $(GRAPES)
 
+tests:
+	$(MAKE) -C test
+	test/run_tests.sh
+
 clean:
 	$(MAKE) -C src/ clean
+	$(MAKE) -C test/ clean
 	rm -f pstreamer
 
 .PHONY: clean
