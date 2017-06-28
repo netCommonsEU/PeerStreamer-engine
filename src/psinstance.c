@@ -117,7 +117,7 @@ struct psinstance * psinstance_create(const char * srv_ip, const int srv_port, c
 		if (res == 0)
 		{
 			ps->measure = measures_create(nodeid_static_str(ps->my_sock));
-			ps->topology = topology_create(ps, "");
+			ps->topology = topology_create(ps, config);
 			streaming_timers_init(&(ps->timers), ps->chunk_offer_interval);
 			ps->chunk_out = NULL;  // To be used as a flag if current role is source or peer role
 			if (srv_port)

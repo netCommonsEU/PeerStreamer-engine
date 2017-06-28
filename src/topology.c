@@ -30,6 +30,7 @@
 #include <peersampler.h>
 #include <peer.h>
 #include <grapes_msg_types.h>
+#include<grapes_config.h>
 //
 #include "compatibility/timer.h"
 //
@@ -105,9 +106,16 @@ struct peer * topology_get_peer(struct topology * t, const struct nodeID * id)
 
 int topology_init(struct topology * t, const struct psinstance * ps, const char *config)
 {
+	struct tag * tags;
+	int peer_timeout;
+
+	tags = grapes_config_parse(config);
+
 	bind_msg_type(MSG_TYPE_NEIGHBOURHOOD);
 	bind_msg_type(MSG_TYPE_TOPOLOGY);
-	t->tout_bmap.tv_sec = 20;
+
+	grapes_config_value_int_default(tags, "peer_timeout", &peer_timeout, 10);
+	t->tout_bmap.tv_sec = peer_timeout;
 	t->tout_bmap.tv_usec = 0;
 	t->ps = ps;
 
@@ -128,7 +136,7 @@ int topology_init(struct topology * t, const struct psinstance * ps, const char 
 	update_metadata(t);
 	t->tc = psample_init(psinstance_nodeid(ps), &(t->my_metadata), sizeof(struct metadata), config);
 	
-  //fprintf(stderr,"[DEBUG] done with topology init\n");
+	free(tags);
 	return t->tc && t->neighbourhood && t->swarm_bucket ? 1 : 0;
 }
 
@@ -295,10 +303,10 @@ void neighbourhood_drop_unactives(struct topology * t, struct timeval * bmap_tim
     if ( (!timerisset(&peers[i]->bmap_timestamp) && timercmp(&peers[i]->creation_timestamp, &told, <) ) ||
          ( timerisset(&peers[i]->bmap_timestamp) && timercmp(&peers[i]->bmap_timestamp, &told, <)     )   ) {
       dprintf("Topo: dropping inactive %s (peersset_size: %d)\n", nodeid_static_str(peers[i]->id), peerset_size(t->neighbourhood));
-      if (peerset_size(t->neighbourhood) > 1) {	// avoid dropping our last link to the world
+//      if (peerset_size(t->neighbourhood) > 1) {	// avoid dropping our last link to the world
 	      topology_blacklist_add(t, peers[i]->id);
-	      neighbourhood_remove_peer(t, peers[i]->id);
-      }
+	      topology_remove_peer(t, peers[i]->id);
+//      }
     }
   }
 	
