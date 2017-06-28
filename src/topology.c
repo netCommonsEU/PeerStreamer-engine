@@ -40,8 +40,8 @@
 #include "streaming.h"
 
 #define MAX(A,B) (((A) > (B)) ? (A) : (B))
-#define NEIGHBOURHOOD_ADD 0
-#define NEIGHBOURHOOD_REMOVE 1
+enum neighbourhood_msg_t {NEIGHBOURHOOD_ADD, NEIGHBOURHOOD_REMOVE, NEIGHBOURHOOD_QUIT};
+
 #define DEFAULT_PEER_CBSIZE 50
 
 #ifndef NAN	//NAN is missing in some old math.h versions
@@ -199,6 +199,17 @@ void neighbourhood_remove_peer(struct topology * t, const struct nodeID *id)
 	}
 }
 
+void topology_remove_peer(struct topology * t, const struct nodeID *id)
+{
+	if(t && id)
+	{
+		peerset_remove_peer(t->neighbourhood, id);
+		peerset_remove_peer(t->swarm_bucket, id);
+		peerset_remove_peer(t->locked_neighs, id);
+		psample_remove_peer(t->tc, id);
+	}
+}
+
 void neighbourhood_message_parse(struct topology * t, struct nodeID *from, const uint8_t *buff, size_t len)
 {
 	struct metadata m = {0};
@@ -217,6 +228,9 @@ void neighbourhood_message_parse(struct topology * t, struct nodeID *from, const
 
 		case NEIGHBOURHOOD_REMOVE:
 			neighbourhood_remove_peer(t, from);
+			break;
+		case NEIGHBOURHOOD_QUIT:
+			topology_remove_peer(t, from);
 			break;
 		default:
 			dprintf("Unknown neighbourhood message type");
@@ -327,6 +341,18 @@ int neighbourhood_send_msg(struct topology *t, const struct peer * p,uint8_t typ
 	res = send_to_peer(psinstance_nodeid(t->ps), p->id, msg, sizeof(struct metadata)+2);
 	free(msg);
 	return res;	
+}
+
+void topology_quit_overlay(struct topology *t)
+{
+	const struct peer * p;
+	int i;
+
+	dprintf("Notifying known peers of quitting...\n");
+	peerset_for_each(t->neighbourhood, p, i)
+		neighbourhood_send_msg(t, p, NEIGHBOURHOOD_QUIT);
+	peerset_for_each(t->swarm_bucket, p, i)
+		neighbourhood_send_msg(t, p, NEIGHBOURHOOD_QUIT);
 }
 
 void peerset_destroy_reference_copy(struct peerset ** pset)
@@ -474,6 +500,7 @@ void topology_update(struct topology * t)
 
 void topology_destroy(struct topology **t)
 {
+	topology_quit_overlay(*t);
 	if (t && *t)
 	{
 		if(((*t)->locked_neighs))
