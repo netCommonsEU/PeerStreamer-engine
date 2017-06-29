@@ -71,10 +71,8 @@ void _transaction_remove(struct service_times_element ** head, struct service_ti
 void check_neighbor_status_list(struct service_times_element ** stl) {
 	struct service_times_element *stl_iterator, *stl_aux;
 	struct timeval current_time;
-	bool something_got_removed;
 
 	gettimeofday(&current_time, NULL);
-	something_got_removed = false;
 	
         dprintf("LIST: check trans_id list\n");
 	
@@ -85,7 +83,7 @@ void check_neighbor_status_list(struct service_times_element ** stl) {
         
 	// Start from the beginning of the list
 	stl_iterator = *stl;
-	stl_aux = *stl;
+	stl_aux = stl_iterator->forward;
 	// Iterate the list until you get the right element
 	while (stl_iterator != NULL) {
 		// If the element has been in the list for a period greater than the timeout, remove it
@@ -93,22 +91,17 @@ void check_neighbor_status_list(struct service_times_element ** stl) {
 		if ( (current_time.tv_sec + current_time.tv_usec*1e-6 - stl_iterator->st.offer_sent_time) > TRANS_ID_MAX_LIFETIME) {
 			 dprintf("LIST TIMEOUT: trans_id %d, offer_sent_time %f, accept_received_time %f\n", stl_iterator->st.trans_id, (double) ((current_time.tv_sec + current_time.tv_usec*1e-6) - stl_iterator->st.offer_sent_time  ), (double) ((current_time.tv_sec + current_time.tv_usec*1e-6) - stl_iterator->st.accept_received_time));
 			 //fprintf(stderr, "LIST TIMEOUT: trans_id %d, offer_sent_time %f, accept_received_time %f\n", stl_iterator->st.trans_id, (double) ((current_time.tv_sec + current_time.tv_usec*1e-6) - stl_iterator->st.offer_sent_time  ), (double) ((current_time.tv_sec + current_time.tv_usec*1e-6) - stl_iterator->st.accept_received_time));
-		_transaction_remove(stl, stl_iterator);
-			something_got_removed = true;
 #ifndef MONL
 			timeout_reception_measure(stl_iterator->st.id);
 #endif
+		_transaction_remove(stl, stl_iterator);
 
-			stl_aux = stl_iterator->forward;
 			// Free the memory
-			}
-		if (something_got_removed) {
-			stl_iterator = stl_aux;
-			something_got_removed = false;
-			}
-		else
-			stl_iterator = stl_iterator->forward;
 		}
+		stl_iterator = stl_aux;
+		if (stl_iterator)
+			stl_aux = stl_aux->forward;
+	}
 	return;
 }
 
