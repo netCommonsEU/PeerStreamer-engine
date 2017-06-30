@@ -98,7 +98,7 @@ void offer_received(const struct psinstance * ps, struct nodeID *fromid, struct 
 
     //send accept message
     dprintf("\t accept %d chunks from peer %s, trans_id %d\n", chunkID_set_size(cset_acc), nodeid_static_str(fromid), trans_id);
-    acceptChunks(fromid, cset_acc, trans_id);
+    acceptChunks(psinstance_nodeid(ps), fromid, cset_acc, trans_id);
 
     chunkID_set_free(cset_acc);
 }

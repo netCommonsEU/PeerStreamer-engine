@@ -283,7 +283,7 @@ struct chunkID_set *get_chunks_to_accept(const struct streaming_context * stc, s
 void send_bmap(const struct streaming_context *stc, const struct nodeID *toid)
 {
   struct chunkID_set *my_bmap = cb_to_bmap(stc->cb);
-   sendBufferMap(toid,NULL, my_bmap, psinstance_is_source(stc->ps) ? 0 : stc->cb_size, 0);
+   sendBufferMap(psinstance_nodeid(stc->ps), toid, NULL, my_bmap, psinstance_is_source(stc->ps) ? 0 : stc->cb_size, 0);
 #ifdef LOG_SIGNAL
 	log_signal(psinstance_nodeid(stc->ps),toid,chunkID_set_size(my_bmap),0,sig_send_buffermap,"SENT");
 #endif
@@ -303,7 +303,7 @@ void bcast_bmap(const struct streaming_context * stc)
 
   my_bmap = cb_to_bmap(stc->cb);	//cache our bmap for faster processing
   for (i = 0; i<n; i++) {
-    sendBufferMap(neighbours[i]->id,NULL, my_bmap, psinstance_is_source(stc->ps) ? 0 : stc->cb_size, 0);
+    sendBufferMap(psinstance_nodeid(stc->ps),neighbours[i]->id,NULL, my_bmap, psinstance_is_source(stc->ps) ? 0 : stc->cb_size, 0);
 #ifdef LOG_SIGNAL
 	 	log_signal(psinstance_nodeid(stc->ps),neighbours[i]->id,chunkID_set_size(my_bmap),0,sig_send_buffermap,"SENT");
 #endif
@@ -314,7 +314,7 @@ void bcast_bmap(const struct streaming_context * stc)
 void send_ack(const struct streaming_context * stc, struct nodeID *toid, uint16_t trans_id)
 {
   struct chunkID_set *my_bmap = cb_to_bmap(stc->cb);
-  sendAck(toid, my_bmap,trans_id);
+  sendAck(psinstance_nodeid(stc->ps),toid, my_bmap,trans_id);
 #ifdef LOG_SIGNAL
 	log_signal(psinstance_nodeid(stc->ps),toid,chunkID_set_size(my_bmap),trans_id,sig_ack,"SENT");
 #endif
@@ -627,7 +627,7 @@ void send_accepted_chunks(const struct streaming_context * stc, struct nodeID *t
     }
     if (!to || needs(to, chunkid)) {	//he should not have it. Although the "accept" should have been an answer to our "offer", we do some verification
       chunk_attributes_update_sending(c);
-      res = sendChunk(toid, c, trans_id);
+      res = sendChunk(psinstance_nodeid(stc->ps),toid, c, trans_id);
       if (res >= 0) {
         if(to) chunkID_set_add_chunk(to->bmap, c->id); //don't send twice ... assuming that it will actually arrive
         d++;
@@ -729,7 +729,7 @@ void send_offer(struct streaming_context * stc)
       int max_deliver = offer_max_deliver(stc, selectedpeers[i]->id);
       struct chunkID_set *offer_cset = compose_offer_cset(stc, selectedpeers[i]);
       dprintf("\t sending offer(%d) to %s, cb_size: %d\n", transid, nodeid_static_str(selectedpeers[i]->id), selectedpeers[i]->cb_size);
-      offerChunks(selectedpeers[i]->id, offer_cset, max_deliver, transid++);
+      offerChunks(psinstance_nodeid(stc->ps),selectedpeers[i]->id, offer_cset, max_deliver, transid++);
 #ifdef LOG_SIGNAL
 			log_signal(psinstance_nodeid(stc->ps),selectedpeers[i]->id,chunkID_set_size(offer_cset),transid,sig_offer,"SENT");
 #endif
@@ -831,7 +831,7 @@ int peer_chunk_dispatch(struct streaming_context * stc, const struct PeerChunk  
 		}
 		chunk_attributes_update_sending(target_chunk);
 		transid = transaction_create(&(stc->transactions), target_peer->id);
-		res = sendChunk(target_peer->id, target_chunk, transid);	//we use transactions in order to register acks for push
+		res = sendChunk(psinstance_nodeid(stc->ps),target_peer->id, target_chunk, transid);	//we use transactions in order to register acks for push
 		if (res>=0) {
 #ifdef LOG_CHUNK
 			log_chunk(psinstance_nodeid(stc->ps), target_peer->id, target_chunk,"SENT");
@@ -926,7 +926,7 @@ void send_chunk(struct streaming_context * stc)
 
       chunk_attributes_update_sending(c);
       transid = transaction_create(&(stc->transactions), p->id);
-      res = sendChunk(p->id, c, transid);	//we use transactions in order to register acks for push
+      res = sendChunk(psinstance_nodeid(stc->ps),p->id, c, transid);	//we use transactions in order to register acks for push
 //      res = sendChunk(p->id, c, 0);	//we do not use transactions in pure push
       dprintf("\tResult: %d\n", res);
       if (res>=0) {

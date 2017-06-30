@@ -247,6 +247,7 @@ void output_destroy(struct chunk_output ** outg)
 {
 	if (outg && *outg)
 	{
+		buffer_flush(*outg, 0);
 		if((*outg)->buff)
 			free((*outg)->buff);
 		if((*outg)->out)
