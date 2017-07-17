@@ -39,31 +39,24 @@
 #include "dbg.h"
 #include "measures.h"
 #include "streaming.h"
+#include "peer_metadata.h"
+
+extern peer_deinit_f peer_deinit;
+extern peer_init_f peer_init;
 
 #define MAX(A,B) (((A) > (B)) ? (A) : (B))
 enum neighbourhood_msg_t {NEIGHBOURHOOD_ADD, NEIGHBOURHOOD_REMOVE, NEIGHBOURHOOD_QUIT};
-
-#define DEFAULT_PEER_CBSIZE 50
 
 #ifndef NAN	//NAN is missing in some old math.h versions
 #define NAN            (0.0/0.0)
 #endif
 
-struct metadata {
-  uint16_t cb_size;
-} __attribute__((packed));
-
 enum peer_choice {PEER_CHOICE_RANDOM, PEER_CHOICE_BEST, PEER_CHOICE_WORST};
 
 struct topology {
-	double desired_bw;
-	double desired_rtt;
-	double alpha_target;
 	double topo_mem;
 	bool topo_out;
 	bool topo_in;
-	bool topo_keep_best;
-	bool topo_add_best;
 	int neighbourhood_target_size;
 	struct timeval tout_bmap;
 	struct metadata my_metadata;	
@@ -87,12 +80,15 @@ void peerset_print(const struct peerset * pset, const char * name)
 	if(name) fprintf(stderr,"%s\n",name);
 	if(pset)
 		peerset_for_each(pset,p,i)
-			fprintf(stderr, "\t%s\n", nodeid_static_str(p->id));
+			fprintf(stderr, "\t%s, cbsize: %d, neighsize: %d\n", nodeid_static_str(p->id), peer_cb_size(p), peer_neigh_size(p));
 }
 
 void update_metadata(struct topology * t)
 {
-	t->my_metadata.cb_size = psinstance_is_source(t->ps) ? 0 : psinstance_chunkbuffer_size(t->ps);
+	metadata_update(&(t->my_metadata), 
+			psinstance_is_source(t->ps) ? 0 : psinstance_chunkbuffer_size(t->ps),
+			peerset_size(t->neighbourhood));
+	psample_change_metadata(t->tc, &(t->my_metadata), sizeof(struct metadata));
 }
 
 struct peer * topology_get_peer(struct topology * t, const struct nodeID * id)
@@ -106,16 +102,16 @@ struct peer * topology_get_peer(struct topology * t, const struct nodeID * id)
 
 int topology_init(struct topology * t, const struct psinstance * ps, const char *config)
 {
+	peer_deinit = peer_data_deinit;
+	peer_init = peer_data_init;
+
 	struct tag * tags;
-	int peer_timeout;
 
 	tags = grapes_config_parse(config);
 
 	bind_msg_type(MSG_TYPE_NEIGHBOURHOOD);
 	bind_msg_type(MSG_TYPE_TOPOLOGY);
-
-	grapes_config_value_int_default(tags, "peer_timeout", &peer_timeout, 10);
-	t->tout_bmap.tv_sec = peer_timeout;
+	t->tout_bmap.tv_sec = 20;
 	t->tout_bmap.tv_usec = 0;
 	t->ps = ps;
 
@@ -123,18 +119,13 @@ int topology_init(struct topology * t, const struct psinstance * ps, const char 
 	t->swarm_bucket = peerset_init(0);
 	t->locked_neighs = peerset_init(0);
 
-	t->desired_bw = 0;	//TODO: turn on capacity measurement and set meaningful default value
-	t->desired_rtt = 0.2;
-	t->alpha_target = 0.4;
 	t->topo_mem = 0.7;
 	t->topo_out = true; //peer selects out-neighbours
 	t->topo_in = true; //peer selects in-neighbours (combined means bidirectional)
-	t->topo_keep_best = false;
-	t->topo_add_best = false;
-	t->neighbourhood_target_size = 30;
+	grapes_config_value_int_default(tags, "neighbourhood_size", &(t->neighbourhood_target_size), DEFAULT_PEER_NEIGH_SIZE);
 
-	update_metadata(t);
 	t->tc = psample_init(psinstance_nodeid(ps), &(t->my_metadata), sizeof(struct metadata), config);
+	update_metadata(t);
 	
 	free(tags);
 	return t->tc && t->neighbourhood && t->swarm_bucket ? 1 : 0;
@@ -157,21 +148,6 @@ int topology_node_insert(struct topology * t, struct nodeID *id)
 	return psample_add_peer(t->tc,id,&m,sizeof(m));
 }
 
-void topology_peer_set_metadata(struct  peer *p, const struct metadata *m)
-{
-	if (p)
-	{
-		if (m)
-		{
-			p->cb_size = m->cb_size;
-		}
-		else
-		{
-			p->cb_size = DEFAULT_PEER_CBSIZE;
-		}
-
-	}
-}
 
 struct peer * neighbourhood_add_peer(struct topology * t, const struct nodeID *id)
 {
@@ -230,7 +206,7 @@ void neighbourhood_message_parse(struct topology * t, struct nodeID *from, const
 			if (len >= (sizeof(struct metadata) + 1))
 			{
 				memmove(&m,buff+1,sizeof(struct metadata));
-				topology_peer_set_metadata(p,&m);
+				peer_set_metadata(p,&m);
 			}
 			break;
 
@@ -280,10 +256,12 @@ void topology_sample_peers(struct topology * t)
 		p = topology_get_peer(t, sample_nodes[i]);
 		if(p==NULL)
 		{
+			//fprintf(stderr,"[DEBUG] NEW PEER!\n");
 			peerset_add_peer(t->swarm_bucket,sample_nodes[i]);
 			p = topology_get_peer(t, sample_nodes[i]);
 		}
-		topology_peer_set_metadata(p,&(sample_metas[i]));	
+		peer_set_metadata(p,&(sample_metas[i]));	
+		// fprintf(stderr,"[DEBUG] sampled node: %s, cbsize: %d, neighsize: %d\n",nodeid_static_str(sample_nodes[i]), sample_metas[i].cb_size, sample_metas[i].neigh_size);
 	}
 }
 
@@ -300,8 +278,8 @@ void neighbourhood_drop_unactives(struct topology * t, struct timeval * bmap_tim
   timersub(&tnow, bmap_timeout, &told);
   peers = peerset_get_peers(t->neighbourhood);
   for (i = 0; i < peerset_size(t->neighbourhood); i++) {
-    if ( (!timerisset(&peers[i]->bmap_timestamp) && timercmp(&peers[i]->creation_timestamp, &told, <) ) ||
-         ( timerisset(&peers[i]->bmap_timestamp) && timercmp(&peers[i]->bmap_timestamp, &told, <)     )   ) {
+    if ((!timerisset(peer_bmap_timestamp(peers[i])) && timercmp(peer_creation_timestamp(peers[i]), &told, <) ) ||
+         ( timerisset(peer_bmap_timestamp(peers[i])) && timercmp(peer_bmap_timestamp(peers[i]), &told, <)     )   ) {
       dprintf("Topo: dropping inactive %s (peersset_size: %d)\n", nodeid_static_str(peers[i]->id), peerset_size(t->neighbourhood));
 //      if (peerset_size(t->neighbourhood) > 1) {	// avoid dropping our last link to the world
 	      topology_blacklist_add(t, peers[i]->id);
@@ -330,11 +308,6 @@ double get_rtt_of(struct topology *t, const struct nodeID* n){
 }
 
 double get_capacity_of(struct topology *t, const struct nodeID* n){
-  struct peer *p = topology_get_peer(t, n);
-  if (p) {
-    return p->capacity;
-  }
-
   return NAN;
 }
 
@@ -483,27 +456,27 @@ void topology_update_random(struct topology * t)
 void topology_update(struct topology * t)
 {
 	struct peerset * old_neighs;
-  const struct peer * p;
-  int i;
+	const struct peer * p;
+	int i;
 
-  psample_parse_data(t->tc,NULL,0); // needed in order to trigger timed sending of TOPO messages
+	psample_parse_data(t->tc,NULL,0); // needed in order to trigger timed sending of TOPO messages
 
 	update_metadata(t);
 	topology_sample_peers(t);
 
-  if timerisset(&(t->tout_bmap) )
+	if timerisset(&(t->tout_bmap) )
 		neighbourhood_drop_unactives(t, &(t->tout_bmap));
 
 	old_neighs = peerset_create_reference_copy(t->neighbourhood);
 
-    topology_update_random(t);
+	topology_update_random(t);
 
-  topology_signal_change(t, old_neighs);
+	topology_signal_change(t, old_neighs);
 	peerset_destroy_reference_copy(&old_neighs);
 
-    peerset_for_each(t->swarm_bucket,p,i)
-      peerset_pop_peer(t->locked_neighs,p->id);
-    peerset_clear(t->swarm_bucket,0);  // we don't remember past peers
+	peerset_for_each(t->swarm_bucket,p,i)
+		peerset_pop_peer(t->locked_neighs,p->id);
+	peerset_clear(t->swarm_bucket,0);  // we don't remember past peers
 }
 
 void topology_destroy(struct topology **t)

@@ -1,7 +1,7 @@
 SRC=$(wildcard *.c)
 OBJS=$(SRC:.c=.test)
 
-GRAPES ?= ../../GRAPES
+GRAPES ?= $(PWD)/../../grapes
 
 TARGET=../src/libpstreamer.a
 TARGET_SRC=$(wildcard ../src/*.c)
@@ -13,7 +13,7 @@ LDFLAGS += -l pstreamer -L ../src -lgrapes -L $(GRAPES)/src
 all: $(OBJS)
 
 $(TARGET): $(TARGET_SRC)
-	DEBUG=1 $(MAKE) -C ../
+	DEBUG=1 GRAPES=$(GRAPES) $(MAKE) -C ../
 
 $(GRAPESLIB):
 	$(MAKE) -C $(GRAPES)

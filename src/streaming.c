@@ -54,8 +54,10 @@
 #include "net_helpers.h"
 #include "scheduling.h"
 #include "transaction.h"
+#include "peer_metadata.h"
 
 #include "scheduler_la.h"
+#include "grapes_config.h"
 
 # define CB_SIZE_TIME_UNLIMITED 1e12
 
@@ -66,6 +68,8 @@ struct chunk_attributes {
   uint16_t deadline_increment;
   uint16_t hopcount;
 } __attribute__((packed));
+
+enum distribution_type {DIST_UNIFORM, DIST_TURBO};
 
 struct streaming_context {
 	struct chunk_buffer *cb;
@@ -79,30 +83,40 @@ struct streaming_context {
 	bool send_bmap_before_push;
 	uint64_t CB_SIZE_TIME;
 	uint32_t chunk_loss_interval;
+	enum distribution_type dist_type;
+	int offer_per_period;
 };
 
 struct streaming_context * streaming_create(const struct psinstance * ps, struct input_context * inc, const char * config)
 {
 	struct streaming_context * stc;
+	struct tag * tags;
 	static char conf[80];
 
 	stc = malloc(sizeof(struct streaming_context));
+	stc->ps = ps;
 	stc->bcast_after_receive_every = 0;
 	stc->neigh_on_chunk_recv = false;
 	stc->send_bmap_before_push = false;
 	stc->transactions = NULL;
 	stc->CB_SIZE_TIME = CB_SIZE_TIME_UNLIMITED;	//in millisec, defaults to unlimited
 	stc->chunk_loss_interval = 0;  // disable self-lossy feature (for experiments)
+	stc->dist_type = DIST_UNIFORM;
+
+	tags = grapes_config_parse(config);
+	if (strcmp(grapes_config_value_str_default(tags, "dist_type", ""), "turbo") == 0)
+		stc->dist_type = DIST_TURBO;
+	grapes_config_value_int_default(tags, "offer_per_period", &(stc->offer_per_period), 1);
+	free(tags);
 
 	stc->input = inc ? input_open(inc->filename, inc->fds, inc->fds_size, config) : NULL;
-
-	stc->ps = ps;
 	stc->cb_size = psinstance_chunkbuffer_size(ps);
 	sprintf(conf, "size=%d", stc->cb_size);
 	stc->cb = cb_init(conf);
+	stc->ch_locks = chunk_locks_create();
+
 	chunkDeliveryInit(psinstance_nodeid(ps));
 	chunkSignalingInit(psinstance_nodeid(ps));
-	stc->ch_locks = chunk_locks_create();
 	return stc;
 }
 
@@ -374,8 +388,8 @@ void received_chunk(struct streaming_context * stc, struct nodeID *from, const u
     }
     p = nodeid_to_peer(psinstance_topology(stc->ps), from, stc->neigh_on_chunk_recv);
     if (p) {	//now we have it almost sure
-      chunkID_set_add_chunk(p->bmap,c.id);	//don't send it back
-      gettimeofday(&p->bmap_timestamp, NULL);
+      chunkID_set_add_chunk(peer_bmap(p), c.id);	//don't send it back
+      gettimeofday(peer_bmap_timestamp(p), NULL);
     }
     ack_chunk(stc, &c, from, transid);	//send explicit ack
     if (stc->bcast_after_receive_every && bcast_cnt % stc->bcast_after_receive_every == 0) {
@@ -470,7 +484,7 @@ int needs_old(const struct streaming_context * stc, struct peer *n, int cid){
   }
 
   //dprintf("\t%s needs c%d ? :",node_addr_tr(p->id),c->id);
-  if (! p->bmap) { // this will never happen since the pset module initializes bmap
+  if (! peer_bmap(p)) { // this will never happen since the pset module initializes bmap
     //dprintf("no bmap\n");
     return 1;	// if we have no bmap information, we assume it needs the chunk (aggressive behaviour!)
   }
@@ -478,7 +492,7 @@ int needs_old(const struct streaming_context * stc, struct peer *n, int cid){
 //	fprintf(stderr,"[DEBUG] Evaluating Peer %s, CB_SIZE: %d\n",node_addr_tr(n->id),p->cb_size); // DEBUG
 //	print_chunkID_set(p->bmap);																					// DEBUG
 
-  return _needs(stc, p->bmap, p->cb_size, cid);
+  return _needs(stc, peer_bmap(p), peer_cb_size(p), cid);
 }
 
 /**
@@ -525,18 +539,18 @@ int needs(struct peer *p, int cid)
 {
 	int min;
 
-	if (p->cb_size == 0) // it does not have capacity
+	if (peer_cb_size(p) == 0) // it does not have capacity
 		return 0;
-	if (chunkID_set_check(p->bmap,cid) < 0)  // not in bmap
+	if (chunkID_set_check(peer_bmap(p),cid) < 0)  // not in bmap
 	{
-		if(p->cb_size > chunkID_set_size(p->bmap)) // it has room for chunks anyway
+		if(peer_cb_size(p) > chunkID_set_size(peer_bmap(p))) // it has room for chunks anyway
 		{
-			min = chunkID_set_get_earliest(p->bmap) - p->cb_size + chunkID_set_size(p->bmap);
+			min = chunkID_set_get_earliest(peer_bmap(p)) - peer_cb_size(p) + chunkID_set_size(peer_bmap(p));
 			min = min < 0 ? 0 : min;
 			if (cid >= min)
 				return 1;
 		}
-		if((int)chunkID_set_get_earliest(p->bmap) < cid)  // our is reasonably new
+		if((int)chunkID_set_get_earliest(peer_bmap(p)) < cid)  // our is reasonably new
 			return 1;
 	}
 	return 0;
@@ -544,11 +558,25 @@ int needs(struct peer *p, int cid)
 
 double peerWeightReceivedfrom(struct peer **n){
   struct peer * p = *n;
-  return timerisset(&p->bmap_timestamp) ? 1 : 0.1;
+  return timerisset(peer_bmap_timestamp(p)) ? 1 : 0.1;
 }
 
 double peerWeightUniform(struct peer **n){
   return 1;
+}
+
+double peerWeightNeigh(struct peer **n){
+	double res;
+	res = (double)(((struct metadata *)(*n)->metadata)->neigh_size);
+	if (res)
+		return res;
+	return 1;
+}
+
+double peerWeightInvNeigh(struct peer **n){
+	double res;
+	res = peerWeightNeigh(n);
+	return 1/res;
 }
 
 double peerWeightLoss(struct peer **n){
@@ -629,7 +657,7 @@ void send_accepted_chunks(const struct streaming_context * stc, struct nodeID *t
       chunk_attributes_update_sending(c);
       res = sendChunk(psinstance_nodeid(stc->ps),toid, c, trans_id);
       if (res >= 0) {
-        if(to) chunkID_set_add_chunk(to->bmap, c->id); //don't send twice ... assuming that it will actually arrive
+        if(to) chunkID_set_add_chunk(peer_bmap(to), c->id); //don't send twice ... assuming that it will actually arrive
         d++;
         reg_chunk_send(psinstance_measures(stc->ps),c->id);
 #ifdef LOG_CHUNK
@@ -722,13 +750,16 @@ void send_offer(struct streaming_context * stc)
 
     for (i = 0;i < size; i++) chunkids[size - 1 - i] = (buff+i)->id;
     for (i = 0; i<n; i++) nodeids[i] = neighbours[i];
-    selectPeersForChunks(SCHED_WEIGHTING, nodeids, n, chunkids, size, selectedpeers, &selectedpeers_len, SCHED_NEEDS, SCHED_PEER);
+    if (stc->dist_type == DIST_TURBO)
+	    selectPeersForChunks(SCHED_WEIGHTING, nodeids, n, chunkids, size, selectedpeers, &selectedpeers_len, SCHED_NEEDS, peerWeightInvNeigh);
+    else
+	    selectPeersForChunks(SCHED_WEIGHTING, nodeids, n, chunkids, size, selectedpeers, &selectedpeers_len, SCHED_NEEDS, peerWeightUniform);
 
     for (i=0; i<selectedpeers_len ; i++){
       int transid = transaction_create(&(stc->transactions), selectedpeers[i]->id);
       int max_deliver = offer_max_deliver(stc, selectedpeers[i]->id);
       struct chunkID_set *offer_cset = compose_offer_cset(stc, selectedpeers[i]);
-      dprintf("\t sending offer(%d) to %s, cb_size: %d\n", transid, nodeid_static_str(selectedpeers[i]->id), selectedpeers[i]->cb_size);
+      dprintf("\t sending offer(%d) to %s, cb_size: %d\n", transid, nodeid_static_str(selectedpeers[i]->id), peer_cb_size(selectedpeers[i]));
       offerChunks(psinstance_nodeid(stc->ps),selectedpeers[i]->id, offer_cset, max_deliver, transid++);
 #ifdef LOG_SIGNAL
 			log_signal(psinstance_nodeid(stc->ps),selectedpeers[i]->id,chunkID_set_size(offer_cset),transid,sig_offer,"SENT");
@@ -864,7 +895,10 @@ int inject_chunk(struct streaming_context * stc, const struct chunk * target_chu
 
   //SCHED_TYPE(SCHED_WEIGHTING, peers, peers_num, &(target_chunk->id), 1, selectedpairs, &selectedpairs_len, SCHED_NEEDS, peer_evaluation, SCHED_CHUNK);
  	dst_peers = (struct peer **) malloc(sizeof(struct peer* ) *  multiplicity);
- 	selectPeersForChunks(SCHED_WEIGHTING, peers, peers_num, (int *)&(target_chunk->id) , 1, dst_peers, &selectedpairs_len, NULL, peer_evaluation);
+	if (stc->dist_type == DIST_TURBO)
+		selectPeersForChunks(SCHED_WEIGHTING, peers, peers_num, (int *)&(target_chunk->id) , 1, dst_peers, &selectedpairs_len, NULL, peerWeightNeigh);
+	else
+		selectPeersForChunks(SCHED_WEIGHTING, peers, peers_num, (int *)&(target_chunk->id) , 1, dst_peers, &selectedpairs_len, NULL, peer_evaluation);
 
 	selectedpairs = (struct PeerChunk *)  malloc(sizeof(struct PeerChunk) * selectedpairs_len);
 	for ( i=0; i<selectedpairs_len; i++)
@@ -934,11 +968,31 @@ void send_chunk(struct streaming_context * stc)
       	log_chunk(psinstance_nodeid(stc->ps),p->id,c,"SENT");
 #endif
 //{fprintf(stderr, "TEO: Sending chunk %d to peer: %s at: %"PRIu64" Result: %d Size: %d bytes\n", c->id, node_addr_tr(p->id), gettimeofday_in_us(), res, c->size);}
-        chunkID_set_add_chunk(p->bmap,c->id); //don't send twice ... assuming that it will actually arrive
+        chunkID_set_add_chunk(peer_bmap(p), c->id); //don't send twice ... assuming that it will actually arrive
         reg_chunk_send(psinstance_measures(stc->ps),c->id);
       } else {
         fprintf(stderr,"ERROR sending chunk %d\n",c->id);
       }
     }
   }
+}
+
+suseconds_t streaming_offer_interval(const struct streaming_context *stc)
+{
+	struct peerset *pset;
+	const struct peer * p;
+	int i;
+	double load = 0;
+	suseconds_t offer_int;
+
+	offer_int = chunk_interval_measure(psinstance_measures(stc->ps));
+	
+	if (stc->dist_type == DIST_TURBO) {
+		pset = topology_get_neighbours(psinstance_topology(stc->ps));
+		peerset_for_each(pset,p,i)
+			load += peerWeightInvNeigh((struct peer **)&p);
+		offer_int /= load;
+	}
+
+	return offer_int / stc->offer_per_period;
 }

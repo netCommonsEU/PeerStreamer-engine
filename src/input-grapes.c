@@ -32,6 +32,7 @@
 #include "dbg.h"
 
 #define INITIAL_ID 0
+#define DEFAULT_DATA_INTERVAL 40000
 
 struct input_desc {
   struct input_stream *s;
@@ -132,7 +133,7 @@ int input_get(struct input_desc *s, struct chunk *c)
       delta = 0;
     }
   } else {
-    delta = INT_MAX;
+    delta = DEFAULT_DATA_INTERVAL;
   }
 //			if (c->data)
 //				fprintf(stderr,"chunk size: %d  ",c->size);

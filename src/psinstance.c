@@ -233,7 +233,7 @@ int8_t psinstance_inject_chunk(struct psinstance * ps)
 	return res;
 }
 
-int8_t psinstance_handle_msg(const struct psinstance * ps)
+int8_t psinstance_handle_msg(struct psinstance * ps)
 	/* WARNING: this is a blocking function on the network socket */
 {
 	uint8_t buff[MSG_BUFFSIZE];
@@ -271,6 +271,7 @@ int8_t psinstance_handle_msg(const struct psinstance * ps)
 				fprintf(stderr, "Unknown Message Type %x\n", buff[0]);
 				res = -2;
 		}
+		ps->chunk_offer_interval = streaming_offer_interval(ps->streaming);
 
 	if (remote)
 		nodeid_free(remote);

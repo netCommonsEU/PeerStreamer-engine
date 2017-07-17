@@ -38,10 +38,34 @@ void leave(int sig) {
 	fprintf(stderr, "Received signal %d, exiting!\n", sig);
 }
 
+void show_help()
+{
+	fprintf(stdout, "This is PStreamer, a P2P streaming platform\n");
+	fprintf(stdout, "Options:\n");
+	fprintf(stdout, "\t-i <srv_addr>:\t\tspecifies the bootstrap peer IP address\n");
+	fprintf(stdout, "\t-p <srv_port>:\t\tspecifies the bootstrap peer port number\n");
+	fprintf(stdout, "\t-h:\t\t\tshows this help\n");
+	fprintf(stdout, "\t-c <config_str>:\tdeclares configuration CSV string for the submodules\n");
+	fprintf(stdout, "\n");
+
+	fprintf(stdout, "Configuration CSV string fields:\n");
+	fprintf(stdout, "\tiface=<string>:\t\t\tnetwork interface to be used (e.g., \"lo\")\n");
+	fprintf(stdout, "\tport=<int>:\t\t\tlocal port number to be used (default=6000)\n");
+	fprintf(stdout, "\toutbuff_size=<int>:\t\tsize in chunks for the output buffer (default=75)\n");
+	fprintf(stdout, "\tchunkbuffer_size=<int>:\t\tsize in chunks for the trading buffer (default=50)\n");
+	fprintf(stdout, "\tsource_multipolicity=<int>:\tnumber of chunks the source pushes in seeding (default=3)\n");
+	fprintf(stdout, "\tfilename=<string>:\t\tfilename of a media content to be streamed (source side only)\n");
+	fprintf(stdout, "\tAF=INET|INET6:\t\t\taddress family, IPv4 or IPv6 (default=INET)\n");
+	fprintf(stdout, "\toffer_per_period=<int>:\t\tamount of offer to perform per offer period (default=1)\n");
+	fprintf(stdout, "\tneighbourhood_size=<int>:\ttarget neighbourhood size (default=30)\n");
+	fprintf(stdout, "\tpeer_timeout=<int>:\t\ttimeout in seconds after which a peer is considered dead (default=10)\n");
+	fprintf(stdout, "\tdist_type=random|turbo:\t\tP2P distribution policy (default=random)\n");
+}
+
 void cmdline_parse(int argc, char *argv[])
 {
 	int o;
-	while ((o = getopt(argc, argv, "p:i:c:")) != -1) {
+	while ((o = getopt(argc, argv, "p:i:c:h")) != -1) {
 		switch(o) {
 			case 'p':
 				srv_port = atoi(optarg);
@@ -53,6 +77,10 @@ void cmdline_parse(int argc, char *argv[])
 			case 'c':
 				config = strdup(optarg);
 				config_override = 1;
+				break;
+			case 'h':
+				show_help();
+				running = 0;
 				break;
 			default:
 				fprintf(stderr, "Error: unknown option %c\n", o);
@@ -72,7 +100,7 @@ int main(int argc, char **argv)
 
 	ps = psinstance_create(srv_ip, srv_port, config);
 	while (ps && running)
-		psinstance_poll(ps, 50000000);
+		psinstance_poll(ps, 5000);
 
 	if (config_override)
 		free(config);

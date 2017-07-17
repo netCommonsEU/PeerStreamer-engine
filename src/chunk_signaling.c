@@ -43,6 +43,7 @@
 
 #include "streaming.h"
 #include "topology.h"
+#include "peer_metadata.h"
 // #include "ratecontrol.h"
 #include "dbg.h"
 #include "net_helpers.h"
@@ -54,15 +55,15 @@ void ack_received(const struct psinstance * ps, struct nodeID *fromid, struct ch
   dprintf("The peer %s acked our chunk, max deliver %d, trans_id %d.\n", nodeid_static_str(fromid), max_deliver, trans_id);
 
   if (from) {
-    chunkID_set_clear(from->bmap,0);	//TODO: some better solution might be needed to keep info about chunks we sent in flight.
-    chunkID_set_union(from->bmap,cset);
-    gettimeofday(&from->bmap_timestamp, NULL);
+    chunkID_set_clear(peer_bmap(from), 0);	//TODO: some better solution might be needed to keep info about chunks we sent in flight.
+    chunkID_set_union(peer_bmap(from), cset);
+    gettimeofday(peer_bmap_timestamp(from), NULL);
   }
 
   // rc_reg_ack(trans_id);
 }
 
-void bmap_received(const struct psinstance * ps, struct nodeID *fromid, struct nodeID *ownerid, struct chunkID_set *c_set, int cb_size, uint16_t trans_id) {
+void bmap_received(const struct psinstance * ps, struct nodeID *fromid, struct nodeID *ownerid, struct chunkID_set *c_set, int maxdeliver, uint16_t trans_id) {
   struct peer *owner;
   if (nodeid_equal(fromid, ownerid)) {
     owner = nodeid_to_peer(psinstance_topology(ps), ownerid, neigh_on_sign_recv);
@@ -73,10 +74,9 @@ void bmap_received(const struct psinstance * ps, struct nodeID *fromid, struct n
   }
   
   if (owner) {	//now we have it almost sure
-    chunkID_set_clear(owner->bmap,0);	//TODO: some better solution might be needed to keep info about chunks we sent in flight.
-    chunkID_set_union(owner->bmap,c_set);
-    owner->cb_size = cb_size;
-    gettimeofday(&owner->bmap_timestamp, NULL);
+    chunkID_set_clear(peer_bmap(owner), 0);	//TODO: some better solution might be needed to keep info about chunks we sent in flight.
+    chunkID_set_union(peer_bmap(owner), c_set);
+    gettimeofday(peer_bmap_timestamp(owner), NULL);
   }
 }
 
@@ -88,9 +88,9 @@ void offer_received(const struct psinstance * ps, struct nodeID *fromid, struct 
 
   if (from) {
     //register these chunks in the buffermap. Warning: this should be changed when offers become selective.
-    chunkID_set_clear(from->bmap,0);	//TODO: some better solution might be needed to keep info about chunks we sent in flight.
-    chunkID_set_union(from->bmap,cset);
-    gettimeofday(&from->bmap_timestamp, NULL);
+    chunkID_set_clear(peer_bmap(from), 0);	//TODO: some better solution might be needed to keep info about chunks we sent in flight.
+    chunkID_set_union(peer_bmap(from), cset);
+    gettimeofday(peer_bmap_timestamp(from), NULL);
   }
 
     //decide what to accept
@@ -109,7 +109,7 @@ void accept_received(const struct psinstance * ps, struct nodeID *fromid, struct
   dprintf("The peer %s accepted our offer for %d chunks, max deliver %d.\n", nodeid_static_str(fromid), chunkID_set_size(cset), max_deliver);
 
   if (from) {
-    gettimeofday(&from->bmap_timestamp, NULL);
+    gettimeofday(peer_bmap_timestamp(from), NULL);
   }
 
   // rc_reg_accept(trans_id, chunkID_set_size(cset));
@@ -149,7 +149,7 @@ int sigParseData(const struct psinstance * ps, struct nodeID *fromid, uint8_t *b
     }
     switch (sig_type) {
         case sig_send_buffermap:
-          bmap_received(ps, fromid, ownerid, c_set, max_deliver, trans_id); //FIXME: cb_size has gone from signaling
+          bmap_received(ps, fromid, ownerid, c_set, max_deliver, trans_id); 
           break;
         case sig_offer:
           offer_received(ps, fromid, c_set, max_deliver, trans_id);
