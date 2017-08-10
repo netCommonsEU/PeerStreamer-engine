@@ -24,7 +24,7 @@ tests:
 	GRAPES=$(GRAPES) make -C test/
 
 clean:
-	rm -f $(OBJS) $(TARGET)
+	rm -f $(OBJS) $(TARGET) *.o
 	make -C test/ clean
 
 .PHONY: clean

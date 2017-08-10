@@ -115,6 +115,7 @@ struct net_msg * network_manager_pop_outgoing_net_msg(struct network_manager *nm
 		el = nm->outqueue;
 		if (el)
 		{
+			nm->outqueue = el->next != el ? el->next : NULL;
 			list_del(el);
 			m = list_entry(el, struct net_msg, list);
 		}

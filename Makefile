@@ -11,7 +11,8 @@ pstreamer: pstreamer.c $(LIBPS) $(LIBGRAPES) $(LIBNETHELPER)
 
 tests: $(LIBPS)
 	NET_HELPER=$(NET_HELPER) GRAPES=$(GRAPES) $(MAKE) -C test/
-	test/run_tests.sh
+	GRAPES=$(GRAPES) $(MAKE) -C $(NET_HELPER) tests
+	test/run_tests.sh && $(NET_HELPER)/test/run_tests.sh
 
 $(LIBPS): $(LIBPS_SRC)
 	NET_HELPER=$(NET_HELPER) GRAPES=$(GRAPES) $(MAKE) -C src/
