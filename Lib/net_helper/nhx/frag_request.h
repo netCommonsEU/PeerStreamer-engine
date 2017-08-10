@@ -18,23 +18,22 @@
  *
  */
 
-#ifndef __PACKET_BUCKET_H__
-#define __PACKET_BUCKET_H__
+#ifndef __FRAG_REQUEST_H__
+#define __FRAG_REQUEST_H__
 
-#include<stdlib.h>
+#include<net_msg.h>
 #include<fragment.h>
-#include<fragmented_packet.h>
-#include<stdint.h>
 
+struct frag_request {  // extends net_msg, do not move nm parameter
+	struct net_msg nm;
+	frag_id_t id;
+	packet_id_t pid;
+};
 
-struct packet_bucket;
+struct frag_request * frag_request_create(const struct nodeID * from, const struct nodeID * to, packet_id_t pid, frag_id_t fid, struct list_head * list);
 
-struct packet_bucket * packet_bucket_create(size_t frag_size, uint16_t max_pkt_age);
+void frag_request_destroy(struct frag_request ** fr);
 
-void packet_bucket_destroy(struct packet_bucket ** pb);
-
-struct list_head * packet_bucket_add_packet(struct packet_bucket * pb, const struct nodeID * src, const struct nodeID *dst, packet_id_t pid, const uint8_t *data, size_t data_len);
-
-packet_state_t packet_bucket_add_fragment(struct packet_bucket *pb, const struct fragment *f, struct list_head ** requests);
+struct list_head * frag_request_list_element(struct frag_request *f);
 
 #endif

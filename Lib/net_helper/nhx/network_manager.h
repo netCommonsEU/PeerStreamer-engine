@@ -40,7 +40,7 @@ struct net_msg * network_manager_pop_outgoing_net_msg(struct network_manager *nm
 
 /************************Incoming*************************************/
 
-int8_t network_manager_add_incoming_fragment(struct network_manager * nm, const struct fragment * f);
+packet_state_t network_manager_add_incoming_fragment(struct network_manager * nm, const struct fragment * f);
 
 uint8_t * network_manager_pop_incoming_packet(struct network_manager *nm, const struct nodeID * src, packet_id_t id);
 

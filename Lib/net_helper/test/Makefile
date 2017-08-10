@@ -15,7 +15,7 @@ TARGET_SRC_NHX+=$(wildcard ../nhx/*.c)
 
 GRAPESLIB=$(GRAPES)/src/libgrapes.a
 
-CFLAGS += -g -W -Wall -I$(GRAPES)/include -I../ -I../nhx
+CFLAGS += -g -W -Wall -I$(GRAPES)/include -I../include -I../nhx
 LDFLAGS += -l nethelper -L ../ -lgrapes -L $(GRAPES)/src 
 
 all: $(GRAPESLIB) $(OBJS_NHX) $(OBJS_UDP)

@@ -2,7 +2,7 @@ GRAPES ?= $(PWD)/../../../grapes
 TARGET=libnethelper.a
 
 SRC=net_helpers.c
-CFLAGS+=-I./ -I$(GRAPES)/include
+CFLAGS+=-Iinclude/ -I$(GRAPES)/include
 ifdef DEBUG
 CFLAGS+=-g -W -Wall -O0 -DDEBUG -Wno-unused-parameter -DLOG_CHUNK -DLOG_SIGNAL -Wno-unused-function 
 endif

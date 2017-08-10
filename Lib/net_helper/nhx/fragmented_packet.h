@@ -25,6 +25,8 @@
 #include<fragment.h>
 #include<net_helper.h>
 
+enum packet_state {PKT_READY, PKT_LOADING, PKT_ERROR};
+typedef enum packet_state packet_state_t;
 
 struct fragmented_packet {
 	time_t creation_timestamp;
@@ -41,5 +43,9 @@ packet_id_t fragmented_packet_id(const struct fragmented_packet *fp);
 time_t fragmented_packet_creation_timestamp(const struct fragmented_packet *fp);
 
 struct fragmented_packet * fragmented_packet_create(packet_id_t id, const struct nodeID * from, const struct nodeID *to, const uint8_t * data, size_t data_size, size_t frag_size, struct list_head ** msgs);
+
+struct fragmented_packet * fragmented_packet_empty(packet_id_t pid, const struct nodeID *from, const struct nodeID *to, frag_id_t num_frags);
+
+packet_state_t fragmented_packet_write_fragment(struct fragmented_packet *fp, const struct fragment *f, struct list_head ** requests);
 
 #endif

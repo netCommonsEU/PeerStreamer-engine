@@ -18,23 +18,35 @@
  *
  */
 
-#ifndef __PACKET_BUCKET_H__
-#define __PACKET_BUCKET_H__
-
-#include<stdlib.h>
 #include<fragment.h>
-#include<fragmented_packet.h>
-#include<stdint.h>
+#include<frag_request.h>
+#include<string.h>
 
+struct frag_request * frag_request_create(const struct nodeID * from, const struct nodeID * to, packet_id_t pid, frag_id_t fid, struct list_head * list)
+{
+	struct frag_request * fr;
 
-struct packet_bucket;
+	fr = malloc(sizeof(struct frag_request));
+	net_msg_init((struct net_msg *) fr, NET_FRAGMENT_REQ, from, to, list);
+	fr->pid = pid;
+	fr->id = fid;
 
-struct packet_bucket * packet_bucket_create(size_t frag_size, uint16_t max_pkt_age);
+	return fr;
+}
 
-void packet_bucket_destroy(struct packet_bucket ** pb);
+void frag_request_destroy(struct frag_request ** fr)
+{
+	if (fr && *fr)
+	{
+		net_msg_deinit((struct net_msg *)*fr);
+		free(*fr);
+		*fr = NULL;
+	}
+}
 
-struct list_head * packet_bucket_add_packet(struct packet_bucket * pb, const struct nodeID * src, const struct nodeID *dst, packet_id_t pid, const uint8_t *data, size_t data_len);
-
-packet_state_t packet_bucket_add_fragment(struct packet_bucket *pb, const struct fragment *f, struct list_head ** requests);
-
-#endif
+struct list_head * frag_request_list_element(struct frag_request *f)
+{
+	if (f)
+		return &((struct net_msg*)f)->list;
+	return NULL;
+}

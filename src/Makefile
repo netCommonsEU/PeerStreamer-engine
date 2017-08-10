@@ -8,7 +8,7 @@ TARGET=libpstreamer.a
 ifdef DEBUG
 CFLAGS += -g -W -Wall -O0 -DDEBUG -Wno-unused-parameter -DLOG_CHUNK -DLOG_SIGNAL -Wno-unused-function 
 endif
-CFLAGS += -I./ -I$(GRAPES)/include -I../include -I$(NET_HELPER)/
+CFLAGS += -I./ -I$(GRAPES)/include -I../include -I$(NET_HELPER)/include
 
 $(TARGET): $(OBJS) $(SRC)
 	$(AR) $(ARFLAGS) $(TARGET) $(OBJS) 

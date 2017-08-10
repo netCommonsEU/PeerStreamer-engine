@@ -2,6 +2,7 @@
 #include<assert.h>
 #include<string.h>
 #include<network_manager.h>
+#include<frag_request.h>
 
 
 void network_manager_create_test()
@@ -85,10 +86,72 @@ void network_manager_pop_outgoing_net_msg_test()
 	fprintf(stderr,"%s successfully passed!\n",__func__);
 }
 
+void network_manager_add_incoming_fragment_test()
+{
+	struct network_manager *nm = NULL;
+	struct nodeID *src, *dst;
+	struct fragment f;
+	struct frag_request *fr;
+	struct net_msg * msg;
+	packet_state_t res;
+
+	src = create_node("10.0.0.1", 6000);
+	dst = create_node("10.0.0.2", 6000);
+
+	res = network_manager_add_incoming_fragment(nm, NULL);
+	assert(res == PKT_ERROR);
+	msg = network_manager_pop_outgoing_net_msg(nm);
+	assert(msg == NULL);
+
+	nm = network_manager_create(NULL);
+	res = network_manager_add_incoming_fragment(nm, NULL);
+	assert(res == PKT_ERROR);
+	msg = network_manager_pop_outgoing_net_msg(nm);
+	assert(msg == NULL);
+
+	fragment_init(&f, src, dst, 0, 2, 0, (uint8_t *)"ci", 2, NULL);
+	res = network_manager_add_incoming_fragment(nm, &f);
+	assert(res == PKT_LOADING);
+	msg = network_manager_pop_outgoing_net_msg(nm);
+	assert(msg == NULL);
+	fragment_deinit(&f);
+
+	fragment_init(&f, src, dst, 0, 2, 1, (uint8_t *)"ao", 3, NULL);
+	res = network_manager_add_incoming_fragment(nm, &f);
+	assert(res == PKT_READY);
+	msg = network_manager_pop_outgoing_net_msg(nm);
+	assert(msg == NULL);
+	fragment_deinit(&f);
+	
+	fragment_init(&f, src, dst, 1, 2, 1, (uint8_t *)"foo", 3, NULL);
+	res = network_manager_add_incoming_fragment(nm, &f);
+	assert(res == PKT_LOADING);
+	msg = network_manager_pop_outgoing_net_msg(nm);
+	assert(msg != NULL);
+	fr = (struct frag_request *) msg;
+	assert(fr->pid == 1);
+	assert(fr->id == 0);
+	frag_request_destroy(&fr);
+	fragment_deinit(&f);
+	
+	fragment_init(&f, src, dst, 1, 2, 0, (uint8_t *)"bar", 4, NULL);
+	res = network_manager_add_incoming_fragment(nm, &f);
+	assert(res == PKT_READY);
+	msg = network_manager_pop_outgoing_net_msg(nm);
+	assert(msg == NULL);
+	fragment_deinit(&f);
+
+	network_manager_destroy(&nm);
+	nodeid_free(src);
+	nodeid_free(dst);
+	fprintf(stderr,"%s successfully passed!\n",__func__);
+}
+
 int main()
 {
 	network_manager_create_test();
 	network_manager_enqueue_outgoing_packet_test();
 	network_manager_pop_outgoing_net_msg_test();
+	network_manager_add_incoming_fragment_test();
 	return 0;
 }

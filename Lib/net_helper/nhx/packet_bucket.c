@@ -123,4 +123,32 @@ void packet_bucket_destroy(struct packet_bucket ** pb)
 	}
 }
 
+packet_state_t packet_bucket_add_fragment(struct packet_bucket *pb, const struct fragment *f, struct list_head ** requests)
+{
+	packet_state_t res = PKT_ERROR;
+	struct fragmented_packet dummy;
+	struct fragmented_packet *fp;
+	const struct nodeID * src;
+	const struct nodeID * dst;
 
+	if (pb && f && requests)
+	{
+		dummy.packet_id = f->pid;
+		fp = ord_set_find(pb->packet_set, &dummy);
+		src = ((struct net_msg *)f)->from;
+		dst = ((struct net_msg *)f)->to;
+		if (fp == NULL)
+		{
+			fp = fragmented_packet_empty(f->pid, src, dst, f->frag_num);
+			ord_set_insert(pb->packet_set, fp, 0);
+			if (pb->packet_list)
+				list_add(&(fp->list), pb->packet_list);
+			else {
+				pb->packet_list = &(fp->list);
+				INIT_LIST_HEAD(pb->packet_list);
+			}
+		}
+		res = fragmented_packet_write_fragment(fp, f, requests);
+	}
+	return res;
+}

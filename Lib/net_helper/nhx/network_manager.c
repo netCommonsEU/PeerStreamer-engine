@@ -84,7 +84,7 @@ int8_t network_manager_enqueue_outgoing_packet(struct network_manager *nm, const
 
 	if (nm && dst && data && data_len > 0)
 	{
-		e = ord_set_find(nm->endpoints, dst);
+		e = ord_set_find(nm->endpoints, &dst);
 		if (!e)
 		{
 			e = endpoint_create(dst, nm->frag_size, nm->max_pkt_age);
@@ -121,4 +121,33 @@ struct net_msg * network_manager_pop_outgoing_net_msg(struct network_manager *nm
 		}
 	}
 	return m;
+}
+
+packet_state_t network_manager_add_incoming_fragment(struct network_manager * nm, const struct fragment * f)
+{
+	packet_state_t res = PKT_ERROR;
+	struct list_head * requests = NULL;
+	struct endpoint * e;
+	const struct nodeID * from;
+
+	if (nm && f)
+	{
+		from = ((struct net_msg *)f)->from;
+		e = ord_set_find(nm->endpoints, &from);
+		if (!e)
+		{
+			e = endpoint_create(from, nm->frag_size, nm->max_pkt_age);
+			ord_set_insert(nm->endpoints, (void *)e, 0);
+		}
+		res = endpoint_add_incoming_fragment(e, f, &requests);
+		if (requests)
+		{
+			if (nm->outqueue)
+				list_splice(nm->outqueue, requests);
+			else
+				nm->outqueue = requests;
+		}
+
+	}
+	return res;
 }

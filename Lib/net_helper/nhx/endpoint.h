@@ -25,6 +25,7 @@
 #include<list.h>
 #include<stdint.h>
 #include<stdlib.h>
+#include<fragmented_packet.h>
 
 
 struct endpoint;
@@ -36,5 +37,7 @@ void endpoint_destroy(struct endpoint ** e);
 int8_t endpoint_cmp(const void * e1, const void *e2);
 
 struct list_head * endpoint_enqueue_outgoing_packet(struct endpoint * e, const struct nodeID * src, const uint8_t * data, size_t data_len);
+
+packet_state_t endpoint_add_incoming_fragment(struct endpoint * e, const struct fragment *f, struct list_head ** requests);
 
 #endif
