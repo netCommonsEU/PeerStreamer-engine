@@ -1,10 +1,21 @@
 /*
- *  Copyright (c) 2010 Luca Abeni
- *  Copyright (c) 2010 Csaba Kiraly
- *  Copyright (c) 2010 Alessandro Russo
- *  Copyright (c) 2017 Luca Baldesi
+ * Copyright (c) 2017 Luca Baldesi
  *
- *  This is free software; see lgpl-2.1.txt
+ * This file is part of PeerStreamer.
+ *
+ * PeerStreamer is free software: you can redistribute it and/or
+ * modify it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * PeerStreamer is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero
+ * General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with PeerStreamer.  If not, see <http://www.gnu.org/licenses/>.
+ *
  */
 
 #include <sys/types.h>
