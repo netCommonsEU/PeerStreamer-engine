@@ -29,7 +29,6 @@
 #include <arpa/inet.h>
 #include <net/if.h>     /* For struct ifreq */
 #include <netdb.h>
-#include <dbg.h>
 #else
 #ifndef _WIN32_WINNT
 #define _WIN32_WINNT 0x0501 /* WINNT>=0x501 (WindowsXP) for supporting getaddrinfo/freeaddrinfo.*/
@@ -42,6 +41,12 @@
 #include <string.h>
 
 #include "net_helpers.h"
+
+#ifdef DEBUG
+#define dtprintf(...) fprintf(stderr,__VA_ARGS__)
+#else
+#define dtprintf(...)
+#endif
 
 char *iface_addr(const char *iface, enum L3PROTOCOL l3)
 {

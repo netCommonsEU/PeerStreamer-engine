@@ -23,9 +23,10 @@
 #define NET_HELPERS_H
 
 #include<net_helper.h>
-#include<pstreamer_event.h>
 
 #define NODE_STR_LENGTH 80
+
+typedef void (*fd_register_f)(void *, int, char);
 
 enum L3PROTOCOL {IP4, IP6};
 

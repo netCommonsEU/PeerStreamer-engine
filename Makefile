@@ -1,22 +1,29 @@
 GRAPES ?= $(PWD)/../grapes
+NET_HELPER ?= $(PWD)/Lib/net_helper
+LIBNETHELPER=$(NET_HELPER)/libnethelper.a
 LIBGRAPES=$(GRAPES)/src/libgrapes.a
 LIBPS=src/libpstreamer.a
 LIBPS_SRC=$(wildcard src/*.c)
+LDFLAGS+=-l pstreamer -L src -l grapes -L $(GRAPES)/src -l nethelper -L$(NET_HELPER)
 
-pstreamer: pstreamer.c $(LIBPS) $(LIBGRAPES)
-	cc pstreamer.c -o pstreamer -I $(GRAPES)/include -I include/ -l pstreamer -L src -l grapes -L $(GRAPES)/src
+pstreamer: pstreamer.c $(LIBPS) $(LIBGRAPES) $(LIBNETHELPER)
+	cc pstreamer.c -o pstreamer -I $(GRAPES)/include -I include/ $(LDFLAGS)
 
 tests: $(LIBPS)
-	GRAPES=$(GRAPES) $(MAKE) -C test/
+	NET_HELPER=$(NET_HELPER) GRAPES=$(GRAPES) $(MAKE) -C test/
 	test/run_tests.sh
 
 $(LIBPS): $(LIBPS_SRC)
-	GRAPES=$(GRAPES) $(MAKE) -C src/
+	NET_HELPER=$(NET_HELPER) GRAPES=$(GRAPES) $(MAKE) -C src/
 
 $(LIBGRAPES):
 	$(MAKE) -C $(GRAPES)
 
+$(LIBNETHELPER):
+	NET_UDP=1 $(MAKE) -C $(NET_HELPER)
+
 clean:
+	$(MAKE) -C $(NET_HELPER)/ clean
 	$(MAKE) -C src/ clean
 	$(MAKE) -C test/ clean
 	rm -f pstreamer

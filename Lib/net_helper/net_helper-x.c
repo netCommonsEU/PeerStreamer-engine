@@ -4,7 +4,6 @@
  *  Copyright (c) 2010 Alessandro Russo
  *  Copyright (c) 2017 Luca Baldesi
  *
- *  This is free software; see lgpl-2.1.txt
  */
 
 #include <sys/types.h>
@@ -14,7 +13,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
-#include <pstreamer_event.h>
+#include <net_helpers.h>
 
 #ifndef _WIN32
 #include <sys/socket.h>
@@ -26,12 +25,19 @@
 #include "win32-net.h"
 #endif
 
-#include "net_helper.h"
+#include<net_helper.h>
+#include<time.h>
+#include<grapes_config.h>
+#include<network_manager.h>
+
+#define MTU 1200
+#define BYTERATE_MULTIPLYER 2
 
 struct nodeID {
 	struct sockaddr_storage addr;
 	uint16_t occurrences;
 	int fd;
+	struct network_manager * nm;
 };
 
 int wait4data(const struct nodeID *s, struct timeval *tout, int *user_fds)
@@ -102,6 +108,7 @@ struct nodeID *create_node(const char *IPaddr, int port)
 		memset(s, 0, sizeof(struct nodeID));
 		s->occurrences = 1;
 		s->fd = -1;
+		s->nm = NULL;
 
 		if ((error = getaddrinfo(IPaddr, NULL, &hints, &result)) == 0)
 		{
@@ -140,8 +147,10 @@ struct nodeID *create_node(const char *IPaddr, int port)
 struct nodeID *net_helper_init(const char *my_addr, int port, const char *config)
 {
 	int res;
+	struct tag * tags = NULL;
 	struct nodeID *myself = NULL;;
 
+	fprintf(stderr, "[DEBUG] in X\n");
 	if (my_addr && port > 0)
 	{
 		myself = create_node(my_addr, port);
@@ -165,7 +174,8 @@ struct nodeID *net_helper_init(const char *my_addr, int port, const char *config
 		{
 			nodeid_free(myself);
 			myself = NULL;
-		}
+		} else
+			myself->nm = network_manager_create(NULL);
 
 	}
 	return myself;
@@ -177,7 +187,16 @@ void bind_msg_type (uint8_t msgtype)
 
 int send_to_peer(const struct nodeID *from, const struct nodeID *to, const uint8_t *buffer_ptr, int buffer_size)
 {
-	return sendto(from->fd, buffer_ptr, buffer_size, MSG_CONFIRM, (const struct sockaddr *)&(to->addr), sizeof(struct sockaddr_storage));
+	int8_t res = -1;
+	struct net_msg * msg = NULL;
+
+	if (from && from->nm && to && buffer_ptr && buffer_ptr > 0)
+	{
+		res = 1; //network_manager_enqueue_outgoing_packet(from->nm, to, buffer_ptr, buffer_size);
+		// while ((msg = network_manager_pop_outgoing_net_msg(from->nm)))
+		// 	net_msg_send(msg);
+	}
+	return res >= 0 ? buffer_size : res;
 }
 
 int recv_from_peer(const struct nodeID *local, struct nodeID **remote, uint8_t *buffer_ptr, int buffer_size)
@@ -310,6 +329,8 @@ void nodeid_free(struct nodeID *s)
 		{
 			if (s->fd >= 0)
 				close(s->fd);
+			if (s->nm)
+				network_manager_destroy(&(s->nm));
 			free(s);
 		}
 	}

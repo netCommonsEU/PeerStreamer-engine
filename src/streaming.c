@@ -51,7 +51,7 @@
 #include "chunklock.h"
 #include "topology.h"
 #include "measures.h"
-#include "net_helpers.h"
+#include <net_helpers.h>
 #include "scheduling.h"
 #include "transaction.h"
 #include "peer_metadata.h"
