@@ -40,4 +40,6 @@ struct list_head * endpoint_enqueue_outgoing_packet(struct endpoint * e, const s
 
 packet_state_t endpoint_add_incoming_fragment(struct endpoint * e, const struct fragment *f, struct list_head ** requests);
 
+int8_t endpoint_pop_incoming_packet(struct endpoint *e, packet_id_t pid, uint8_t * buff, size_t * size);
+
 #endif

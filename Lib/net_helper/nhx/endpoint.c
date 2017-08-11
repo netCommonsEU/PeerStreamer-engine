@@ -77,3 +77,8 @@ packet_state_t endpoint_add_incoming_fragment(struct endpoint * e, const struct 
 {
 	return packet_bucket_add_fragment(e->incoming, f, requests);
 }
+
+int8_t endpoint_pop_incoming_packet(struct endpoint *e, packet_id_t pid, uint8_t * buff, size_t * size)
+{
+	return packet_bucket_pop_packet(e->incoming, pid, buff, size);
+}

@@ -151,3 +151,20 @@ packet_state_t network_manager_add_incoming_fragment(struct network_manager * nm
 	}
 	return res;
 }
+
+int8_t network_manager_pop_incoming_packet(struct network_manager *nm, const struct nodeID * src, packet_id_t id, uint8_t * buff, size_t *size)
+{
+	int8_t res = -1;
+	struct endpoint * e;
+
+	if (nm && src && size && buff)
+	{
+		e = ord_set_find(nm->endpoints, &src);
+		if (e)
+			res = endpoint_pop_incoming_packet(e, id, buff, size);
+		else
+			res = -2;
+
+	}
+	return res;
+}

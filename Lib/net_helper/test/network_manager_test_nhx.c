@@ -147,11 +147,71 @@ void network_manager_add_incoming_fragment_test()
 	fprintf(stderr,"%s successfully passed!\n",__func__);
 }
 
+void network_manager_pop_incoming_packet_test()
+{
+	struct network_manager *nm = NULL;
+	struct nodeID *src, *dst;
+	struct fragment f;
+	int8_t res;
+	uint8_t buff[200];
+	size_t maxsize = 200, size;
+
+	src = create_node("10.0.0.1", 6000);
+	dst = create_node("10.0.0.2", 6000);
+	size = maxsize;
+
+	res = network_manager_pop_incoming_packet(nm, NULL, 0, NULL, NULL);
+	assert(res < 0);
+
+	nm = network_manager_create(NULL);
+
+	res = network_manager_pop_incoming_packet(nm, src, 0, buff, NULL);
+	assert(res < 0);
+
+	res = network_manager_pop_incoming_packet(nm, src, 0, NULL, &size);
+	assert(res < 0);
+
+	res = network_manager_pop_incoming_packet(nm, NULL, 0, buff, &size);
+	assert(res < 0);
+
+	res = network_manager_pop_incoming_packet(nm, src, 0, buff, &size);
+	assert(res < 0);
+
+	fragment_init(&f, src, dst, 0, 2, 0, (uint8_t *)"ci", 2, NULL);
+	network_manager_add_incoming_fragment(nm, &f);
+	fragment_deinit(&f);
+
+	fragment_init(&f, src, dst, 0, 2, 1, (uint8_t *)"ao", 3, NULL);
+	network_manager_add_incoming_fragment(nm, &f);
+	fragment_deinit(&f);
+
+	res = network_manager_pop_incoming_packet(nm, src, 0, buff, &size);
+	assert(res == 0);
+	assert(size == 5);
+	assert(strcmp("ciao", (char *)buff) == 0);
+
+	fragment_init(&f, src, dst, 1, 20, 0, (uint8_t *)"foo", 4, NULL);
+	network_manager_add_incoming_fragment(nm, &f);
+	fragment_deinit(&f);
+
+	size = maxsize;
+	res = network_manager_pop_incoming_packet(nm, src, 1, buff, &size);
+	assert(res == 0);
+	assert(size == 4);
+	assert(strcmp("foo", (char *)buff) == 0);
+
+	network_manager_destroy(&nm);
+	nodeid_free(src);
+	nodeid_free(dst);
+	fprintf(stderr,"%s successfully passed!\n",__func__);
+}
+
 int main()
 {
 	network_manager_create_test();
 	network_manager_enqueue_outgoing_packet_test();
 	network_manager_pop_outgoing_net_msg_test();
 	network_manager_add_incoming_fragment_test();
+	network_manager_pop_incoming_packet_test();
 	return 0;
 }

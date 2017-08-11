@@ -33,6 +33,16 @@ struct packet_bucket {
 	uint16_t max_pkt_age;
 };
 
+void packet_bucket_destroy_packet(struct packet_bucket *pb, struct fragmented_packet * fp)
+{
+	if (list_empty(pb->packet_list))
+		pb->packet_list = NULL;
+	else
+		list_del(&(fp->list));
+	ord_set_remove(pb->packet_set, fp, 0);
+	fragmented_packet_destroy(&fp);
+}
+
 void packet_bucket_periodic_refresh(struct packet_bucket * pb)
 {
 	struct list_head * pos, *tmp;
@@ -47,11 +57,8 @@ void packet_bucket_periodic_refresh(struct packet_bucket * pb)
 		tmp = pos->next;
 		fp = list_entry(pos, struct fragmented_packet, list);
 		if (current_time - fragmented_packet_creation_timestamp(fp) >= pb->max_pkt_age)
-		{
-			list_del(pos);
-			ord_set_remove(pb->packet_set, fp, 0);
-			fragmented_packet_destroy(&fp);
-		} else
+			packet_bucket_destroy_packet(pb, fp);
+		else
 			time_check = 0;
 		pos = tmp;
 	}
@@ -150,5 +157,21 @@ packet_state_t packet_bucket_add_fragment(struct packet_bucket *pb, const struct
 		}
 		res = fragmented_packet_write_fragment(fp, f, requests);
 	}
+	return res;
+}
+
+int8_t packet_bucket_pop_packet(struct packet_bucket *pb, packet_id_t pid, uint8_t * buff, size_t * size)
+{
+	struct fragmented_packet * fp, dummy;
+	int8_t res = -2;
+
+	dummy.packet_id = pid;
+	fp = ord_set_find(pb->packet_set, &dummy);
+	if (fp)
+	{
+		res = fragmented_packet_dump_data(fp, buff, size);
+		packet_bucket_destroy_packet(pb, fp);
+	}
+
 	return res;
 }

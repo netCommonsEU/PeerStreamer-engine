@@ -37,4 +37,6 @@ struct list_head * packet_bucket_add_packet(struct packet_bucket * pb, const str
 
 packet_state_t packet_bucket_add_fragment(struct packet_bucket *pb, const struct fragment *f, struct list_head ** requests);
 
+int8_t packet_bucket_pop_packet(struct packet_bucket *pb, packet_id_t pid, uint8_t * buff, size_t * size);
+
 #endif

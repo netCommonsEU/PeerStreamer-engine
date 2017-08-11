@@ -48,4 +48,6 @@ struct fragmented_packet * fragmented_packet_empty(packet_id_t pid, const struct
 
 packet_state_t fragmented_packet_write_fragment(struct fragmented_packet *fp, const struct fragment *f, struct list_head ** requests);
 
+int8_t fragmented_packet_dump_data(struct fragmented_packet *fp, uint8_t * buff, size_t * size);
+
 #endif

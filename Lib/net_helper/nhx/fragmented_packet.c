@@ -146,3 +146,23 @@ packet_state_t fragmented_packet_write_fragment(struct fragmented_packet *fp, co
 	}
 	return res;
 }
+
+int8_t fragmented_packet_dump_data(struct fragmented_packet *fp, uint8_t * buff, size_t * size)
+{
+	int res = 0;
+	frag_id_t i;
+	size_t datasize = 0;
+
+	for(i = 0; i < fp->frag_num && res < 1; i++)
+	{
+		if (fp->frags[i].data_size + datasize < *size)
+		{
+			memmove(buff+datasize, fp->frags[i].data, fp->frags[i].data_size);
+			datasize += fp->frags[i].data_size;
+		} else
+			res = 1;
+	}
+	*size = datasize;
+
+	return res;
+}
