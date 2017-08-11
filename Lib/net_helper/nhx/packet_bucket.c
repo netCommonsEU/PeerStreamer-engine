@@ -140,6 +140,7 @@ packet_state_t packet_bucket_add_fragment(struct packet_bucket *pb, const struct
 
 	if (pb && f && requests)
 	{
+		packet_bucket_periodic_refresh(pb);
 		dummy.packet_id = f->pid;
 		fp = ord_set_find(pb->packet_set, &dummy);
 		src = ((struct net_msg *)f)->from;
@@ -165,6 +166,7 @@ int8_t packet_bucket_pop_packet(struct packet_bucket *pb, packet_id_t pid, uint8
 	struct fragmented_packet * fp, dummy;
 	int8_t res = -2;
 
+	packet_bucket_periodic_refresh(pb);
 	dummy.packet_id = pid;
 	fp = ord_set_find(pb->packet_set, &dummy);
 	if (fp)
@@ -174,4 +176,16 @@ int8_t packet_bucket_pop_packet(struct packet_bucket *pb, packet_id_t pid, uint8
 	}
 
 	return res;
+}
+
+struct fragment * packet_bucket_get_fragment(struct packet_bucket *pb, packet_id_t pid, frag_id_t fid)
+{
+	struct fragmented_packet * fp, dummy;
+
+	packet_bucket_periodic_refresh(pb);
+	dummy.packet_id = pid;
+	fp = ord_set_find(pb->packet_set, &dummy);
+	if (fp)
+		return fragmented_packet_fragment(fp, fid);
+	return NULL;
 }

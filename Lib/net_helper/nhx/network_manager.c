@@ -168,3 +168,32 @@ int8_t network_manager_pop_incoming_packet(struct network_manager *nm, const str
 	}
 	return res;
 }
+
+int8_t network_manager_enqueue_outgoing_fragment(struct network_manager *nm, const struct nodeID * dst, packet_id_t id, frag_id_t fid)
+{
+	int8_t res = -1;  // invalid input
+	struct endpoint * e;
+	struct fragment * f = NULL;
+
+	if (nm && dst)
+	{
+		res = -2;  // endpoint/packet/fragment not found
+		e = ord_set_find(nm->endpoints, &dst);
+		if (e)
+			f = endpoint_get_outgoing_fragment(e, id, fid);
+		if (f)
+		{
+			if (list_empty(fragment_list_element(f)))
+			{
+				res = 0;  // ok
+				if (nm->outqueue)
+					list_add(fragment_list_element(f), nm->outqueue);
+				else
+					nm->outqueue = fragment_list_element(f);
+			} else
+				res = 1;  // fragment already in sending queue
+		}
+	}
+
+	return res;
+}

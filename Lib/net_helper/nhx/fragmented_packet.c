@@ -166,3 +166,10 @@ int8_t fragmented_packet_dump_data(struct fragmented_packet *fp, uint8_t * buff,
 
 	return res;
 }
+
+struct fragment * fragmented_packet_fragment(struct fragmented_packet *fp, frag_id_t fid)
+{
+	if (fid < fp->frag_num)
+		return &(fp->frags[fid]);
+	return NULL;
+}

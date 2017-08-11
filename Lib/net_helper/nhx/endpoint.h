@@ -42,4 +42,6 @@ packet_state_t endpoint_add_incoming_fragment(struct endpoint * e, const struct 
 
 int8_t endpoint_pop_incoming_packet(struct endpoint *e, packet_id_t pid, uint8_t * buff, size_t * size);
 
+struct fragment * endpoint_get_outgoing_fragment(struct endpoint *e, packet_id_t pid, frag_id_t fid);
+
 #endif

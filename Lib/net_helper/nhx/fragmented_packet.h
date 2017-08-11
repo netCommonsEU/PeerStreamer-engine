@@ -50,4 +50,6 @@ packet_state_t fragmented_packet_write_fragment(struct fragmented_packet *fp, co
 
 int8_t fragmented_packet_dump_data(struct fragmented_packet *fp, uint8_t * buff, size_t * size);
 
+struct fragment * fragmented_packet_fragment(struct fragmented_packet *fp, frag_id_t fid);
+
 #endif

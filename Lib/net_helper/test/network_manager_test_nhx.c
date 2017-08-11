@@ -206,6 +206,43 @@ void network_manager_pop_incoming_packet_test()
 	fprintf(stderr,"%s successfully passed!\n",__func__);
 }
 
+void network_manager_enqueue_outgoing_fragment_test()
+{
+	struct network_manager *nm = NULL;
+	struct nodeID *src, *dst;
+	struct net_msg * msg;
+	int8_t res;
+
+	src = create_node("10.0.0.1", 6000);
+	dst = create_node("10.0.0.2", 6000);
+
+	res = network_manager_enqueue_outgoing_fragment(nm, dst, 0, 0);
+	assert(res < 0);
+
+	nm = network_manager_create("frag_size=7");
+
+	res = network_manager_enqueue_outgoing_fragment(nm, NULL, 0, 0);
+	assert(res < 0);
+
+	network_manager_enqueue_outgoing_packet(nm, src, dst, (uint8_t*)"ciao", 5);
+	msg = network_manager_pop_outgoing_net_msg(nm);
+	msg = network_manager_pop_outgoing_net_msg(nm);
+	assert(msg == NULL);
+
+	res = network_manager_enqueue_outgoing_fragment(nm, dst, 4, 0);
+	assert(res < 0);
+
+	res = network_manager_enqueue_outgoing_fragment(nm, dst, 0, 0);
+	assert(res == 0);
+	msg = network_manager_pop_outgoing_net_msg(nm);
+	assert(msg != NULL);
+
+	network_manager_destroy(&nm);
+	nodeid_free(src);
+	nodeid_free(dst);
+	fprintf(stderr,"%s successfully passed!\n",__func__);
+}
+
 int main()
 {
 	network_manager_create_test();
@@ -213,5 +250,6 @@ int main()
 	network_manager_pop_outgoing_net_msg_test();
 	network_manager_add_incoming_fragment_test();
 	network_manager_pop_incoming_packet_test();
+	network_manager_enqueue_outgoing_fragment_test();
 	return 0;
 }

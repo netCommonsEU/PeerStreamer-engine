@@ -39,4 +39,6 @@ packet_state_t packet_bucket_add_fragment(struct packet_bucket *pb, const struct
 
 int8_t packet_bucket_pop_packet(struct packet_bucket *pb, packet_id_t pid, uint8_t * buff, size_t * size);
 
+struct fragment * packet_bucket_get_fragment(struct packet_bucket *pb, packet_id_t pid, frag_id_t fid);
+
 #endif

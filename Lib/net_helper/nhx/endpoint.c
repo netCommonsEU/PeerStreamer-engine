@@ -82,3 +82,8 @@ int8_t endpoint_pop_incoming_packet(struct endpoint *e, packet_id_t pid, uint8_t
 {
 	return packet_bucket_pop_packet(e->incoming, pid, buff, size);
 }
+
+struct fragment * endpoint_get_outgoing_fragment(struct endpoint *e, packet_id_t pid, frag_id_t fid)
+{
+	return packet_bucket_get_fragment(e->outgoing, pid, fid);
+}
