@@ -197,3 +197,10 @@ int8_t network_manager_enqueue_outgoing_fragment(struct network_manager *nm, con
 
 	return res;
 }
+
+int8_t network_manager_outgoing_queue_ready(struct network_manager *nm)
+{
+	if (nm && nm->outqueue)
+		return 1;
+	return 0;
+}

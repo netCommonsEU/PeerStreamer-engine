@@ -38,6 +38,8 @@ int8_t network_manager_enqueue_outgoing_packet(struct network_manager *nm, const
 
 struct net_msg * network_manager_pop_outgoing_net_msg(struct network_manager *nm);
 
+int8_t network_manager_outgoing_queue_ready(struct network_manager *nm);
+
 /************************Incoming*************************************/
 
 packet_state_t network_manager_add_incoming_fragment(struct network_manager * nm, const struct fragment * f);
