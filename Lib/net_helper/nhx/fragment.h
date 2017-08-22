@@ -41,4 +41,10 @@ void fragment_deinit(struct fragment * f);
 
 struct list_head * fragment_list_element(struct fragment *f);
 
+ssize_t fragment_send(int sockfd, const struct sockaddr *dest_addr, socklen_t addrlen, struct fragment * f, uint8_t * buff, size_t buff_len);
+
+struct fragment * fragment_decode(const struct nodeID *dst, const struct nodeID *src, const uint8_t * buff, size_t buff_len);
+
+int8_t fragment_encode(struct fragment * frag, uint8_t * buff, size_t buff_len);
+
 #endif

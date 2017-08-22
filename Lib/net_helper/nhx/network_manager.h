@@ -27,6 +27,8 @@
 #include<fragmented_packet.h>
 #include<fragment.h>
 
+#define DEFAULT_FRAG_SIZE 1200
+
 struct network_manager;
 
 struct network_manager * network_manager_create(const char * config);

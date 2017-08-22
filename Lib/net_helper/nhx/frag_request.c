@@ -22,6 +22,8 @@
 #include<frag_request.h>
 #include<string.h>
 
+#define FRAG_REQUEST_HEADER_LEN (sizeof(net_msg_t) + sizeof(packet_id_t) + sizeof(frag_id_t))
+
 struct frag_request * frag_request_create(const struct nodeID * from, const struct nodeID * to, packet_id_t pid, frag_id_t fid, struct list_head * list)
 {
 	struct frag_request * fr;
@@ -49,4 +51,56 @@ struct list_head * frag_request_list_element(struct frag_request *f)
 	if (f)
 		return &((struct net_msg*)f)->list;
 	return NULL;
+}
+
+int8_t frag_request_encode(struct frag_request *fr, uint8_t * buff, size_t buff_len)
+{
+	int8_t res = -1;
+	uint8_t * ptr;
+
+	ptr = buff;
+	if (fr && buff && buff_len >= FRAG_REQUEST_HEADER_LEN)
+	{
+		*((net_msg_t*) ptr) = NET_FRAGMENT_REQ;
+		ptr += sizeof(net_msg_t);
+		*((packet_id_t*) ptr) = fr->pid;
+		ptr += sizeof(packet_id_t);
+		*((frag_id_t*) ptr) = fr->id;
+		ptr += sizeof(frag_id_t);
+		
+		res = 0;
+	}
+	return res;
+}
+
+ssize_t frag_request_send(int sockfd, const struct sockaddr *dest_addr, socklen_t addrlen, struct frag_request * fr, uint8_t * buff, size_t buff_len)
+{
+	ssize_t res = -1;
+
+	if (dest_addr && fr && buff && buff_len >= FRAG_REQUEST_HEADER_LEN)
+	{
+		frag_request_encode(fr, buff, buff_len);
+		
+		res = sendto(sockfd, buff, FRAG_REQUEST_HEADER_LEN, MSG_CONFIRM, dest_addr, addrlen);
+	}
+	return res;
+}
+
+struct frag_request * frag_request_decode(const struct nodeID *dst, const struct nodeID *src, const uint8_t * buff, size_t buff_len)
+{
+	struct frag_request * msg;
+	const uint8_t * ptr;
+	packet_id_t pid;
+	frag_id_t fid;
+
+	if (dst && src && buff && buff_len >= FRAG_REQUEST_HEADER_LEN)
+	{
+		ptr = buff + sizeof(net_msg_t);
+		pid = *((packet_id_t*)ptr);
+		ptr = ptr + sizeof(packet_id_t);
+		fid = *((frag_id_t*)ptr);
+		msg = frag_request_create(src, dst, pid, fid, NULL);
+	}
+
+	return msg;
 }

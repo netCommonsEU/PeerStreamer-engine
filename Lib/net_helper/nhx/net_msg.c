@@ -19,6 +19,8 @@
  */
 
 #include<net_msg.h>
+#include<fragment.h>
+#include<frag_request.h>
 #include<net_helper.h>
 
 int8_t net_msg_init(struct net_msg * msg, net_msg_t type, const struct nodeID * from, const struct nodeID * to, struct list_head *list)
@@ -49,11 +51,26 @@ void net_msg_deinit(struct net_msg * msg)
 	msg->to = NULL;
 }
 
-// int net_msg_send(struct net_msg * msg)
-// {
-// 	int res;
-// 	switch (msg->type) {
-// 		default:
-// 			res = sendto(msg->from->fd, buffer_ptr, buffer_len, MSG_CONFIRM, (const struct sockaddr *)&(msg->to->addr), sizeof(struct sockaddr_storage));
-// 	}
-// }
+ssize_t net_msg_send(int sockfd, const struct sockaddr *dest_addr, socklen_t addrlen, struct net_msg * msg, uint8_t * buff, size_t buff_len)
+{
+ 	switch (msg->type) {
+		case NET_FRAGMENT:
+			return fragment_send(sockfd, dest_addr, addrlen, (struct fragment*) msg, buff, buff_len);
+		case NET_FRAGMENT_REQ:
+			return frag_request_send(sockfd, dest_addr, addrlen, (struct frag_request*) msg, buff, buff_len);
+ 		default:
+ 			return -1; //sendto(sockfd, buff, buff_len, MSG_CONFIRM, dest_addr, addrlen);
+ 	}
+}
+
+struct net_msg * net_msg_decode(const struct nodeID *dst, const struct nodeID *src, const uint8_t * buff, size_t buff_len)
+{
+ 	switch (*((net_msg_t*)buff)) {
+		case NET_FRAGMENT:
+			return (struct net_msg*) fragment_decode(dst, src, buff, buff_len);
+		case NET_FRAGMENT_REQ:
+			return (struct net_msg*) frag_request_decode(dst, src, buff, buff_len);
+ 		default:
+ 			return NULL;
+ 	}
+}

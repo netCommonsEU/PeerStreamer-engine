@@ -161,7 +161,7 @@ void psinstance_destroy(struct psinstance ** ps)
 		if ((*ps)->iface)
 			free((*ps)->iface);
 		if ((*ps)->my_sock)
-			nodeid_free((*ps)->my_sock);
+			net_helper_deinit((*ps)->my_sock);
 		free(*ps);
 		*ps = NULL;
 	}

@@ -36,4 +36,10 @@ void frag_request_destroy(struct frag_request ** fr);
 
 struct list_head * frag_request_list_element(struct frag_request *f);
 
+ssize_t frag_request_send(int sockfd, const struct sockaddr *dest_addr, socklen_t addrlen, struct frag_request * fr, uint8_t * buff, size_t buff_len);
+
+struct frag_request * frag_request_decode(const struct nodeID *dst, const struct nodeID *src, const uint8_t * buff, size_t buff_len);
+
+int8_t frag_request_encode(struct frag_request *fr, uint8_t * buff, size_t buff_len);
+
 #endif

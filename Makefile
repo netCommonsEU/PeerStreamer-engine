@@ -21,7 +21,7 @@ $(LIBGRAPES):
 	$(MAKE) -C $(GRAPES)
 
 $(LIBNETHELPER):
-	NET_UDP=1 $(MAKE) -C $(NET_HELPER)
+	GRAPES=$(GRAPES) $(MAKE) -C $(NET_HELPER)
 
 clean:
 	$(MAKE) -C $(NET_HELPER)/ clean

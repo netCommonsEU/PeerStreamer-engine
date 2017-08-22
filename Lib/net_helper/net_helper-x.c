@@ -41,16 +41,45 @@
 #include<time.h>
 #include<grapes_config.h>
 #include<network_manager.h>
-
-#define MTU 1200
-#define BYTERATE_MULTIPLYER 2
+#include<network_shaper.h>
+#include<net_msg.h>
+#include<fragment.h>
+#include<frag_request.h>
 
 struct nodeID {
 	struct sockaddr_storage addr;
 	uint16_t occurrences;
 	int fd;
 	struct network_manager * nm;
+	struct network_shaper * shaper;
+	uint8_t * sending_buffer;
+	size_t sending_buffer_len;
 };
+
+void net_helper_send_msg(struct nodeID *s, struct net_msg * msg)
+{
+	net_msg_send(msg->from->fd, (const struct sockaddr *)&(msg->to->addr), sizeof(struct sockaddr_storage), msg, s->sending_buffer, s->sending_buffer_len);
+}
+
+void net_helper_send_attempt(struct nodeID *s, struct timeval *interval)
+{
+	struct net_msg * msg;
+
+	network_shaper_next_sending_interval(s->shaper, interval);
+	if (interval->tv_sec == 0 && interval->tv_usec == 0 && network_manager_outgoing_queue_ready(s->nm))
+	{
+		msg = network_manager_pop_outgoing_net_msg(s->nm);
+		net_helper_send_msg(s, msg);
+		network_shaper_register_sent_bytes(s->shaper, 0);
+		network_shaper_next_sending_interval(s->shaper, interval);
+	}
+}
+
+void net_helper_periodic(struct nodeID *s, struct timeval * interval)
+{
+	if (s && s->shaper && interval)
+		net_helper_send_attempt(s, interval);
+}
 
 int wait4data(const struct nodeID *s, struct timeval *tout, int *user_fds)
 /* returns 0 if timeout expires 
@@ -61,7 +90,10 @@ int wait4data(const struct nodeID *s, struct timeval *tout, int *user_fds)
  */
 {
 	fd_set fds;
-	int i, res, max_fd;
+	int i, res=0, max_fd;
+	int8_t shaping = 1;
+	struct timeval sending_interval;
+	struct timeval sleep_time;
 
 	FD_ZERO(&fds);
 	if (s && s->fd >= 0) {
@@ -78,7 +110,23 @@ int wait4data(const struct nodeID *s, struct timeval *tout, int *user_fds)
 			}
 		}
 	}
-	res = select(max_fd + 1, &fds, NULL, NULL, tout);
+
+	while (shaping && res == 0)
+	{
+		net_helper_send_attempt((struct nodeID*)s, &sending_interval);
+		if (timercmp(&sending_interval, tout, <))
+		{
+			timersub(tout, &sending_interval, &sleep_time);	
+			*tout = sleep_time;
+			sleep_time = sending_interval;
+		}
+		else {
+			sleep_time = *tout;
+			shaping = 0;
+		}
+
+		res = select(max_fd + 1, &fds, NULL, NULL, &sleep_time);
+	}
 	if (res <= 0) {
 		return res;
 	}
@@ -104,6 +152,19 @@ int register_network_fds(const struct nodeID *s, fd_register_f func, void *handl
 	return 0;
 }
 
+struct nodeID *empty_node()
+{
+	struct nodeID *s = NULL;
+	s = malloc(sizeof(struct nodeID));
+	memset(s, 0, sizeof(struct nodeID));
+	s->occurrences = 1;
+	s->fd = -1;
+	s->nm = NULL;
+	s->shaper = NULL;
+	s->sending_buffer = NULL;
+	return s;
+}
+
 struct nodeID *create_node(const char *IPaddr, int port)
 {
 	struct nodeID *s = NULL;
@@ -116,11 +177,7 @@ struct nodeID *create_node(const char *IPaddr, int port)
 		hints.ai_family = AF_UNSPEC;
 		hints.ai_flags = AI_NUMERICHOST;
 
-		s = malloc(sizeof(struct nodeID));
-		memset(s, 0, sizeof(struct nodeID));
-		s->occurrences = 1;
-		s->fd = -1;
-		s->nm = NULL;
+		s = empty_node();
 
 		if ((error = getaddrinfo(IPaddr, NULL, &hints, &result)) == 0)
 		{
@@ -158,11 +215,10 @@ struct nodeID *create_node(const char *IPaddr, int port)
 
 struct nodeID *net_helper_init(const char *my_addr, int port, const char *config)
 {
-	int res;
+	int res, frag_size = DEFAULT_FRAG_SIZE;
 	struct tag * tags = NULL;
 	struct nodeID *myself = NULL;;
 
-	fprintf(stderr, "[DEBUG] in X\n");
 	if (my_addr && port > 0)
 	{
 		myself = create_node(my_addr, port);
@@ -186,8 +242,18 @@ struct nodeID *net_helper_init(const char *my_addr, int port, const char *config
 		{
 			nodeid_free(myself);
 			myself = NULL;
-		} else
-			myself->nm = network_manager_create(NULL);
+		} else {
+			if (config)
+			{
+				tags = grapes_config_parse(config);
+				grapes_config_value_int_default(tags, "frag_size", &frag_size, DEFAULT_FRAG_SIZE);
+				free(tags);
+			}
+			myself->sending_buffer_len = frag_size + 100; // should include the header size
+			myself->sending_buffer = malloc(myself->sending_buffer_len);
+			myself->nm = network_manager_create(config);
+			myself->shaper = network_shaper_create(config);
+		}
 
 	}
 	return myself;
@@ -200,13 +266,11 @@ void bind_msg_type (uint8_t msgtype)
 int send_to_peer(const struct nodeID *from, const struct nodeID *to, const uint8_t *buffer_ptr, int buffer_size)
 {
 	int8_t res = -1;
-	struct net_msg * msg = NULL;
 
-	if (from && from->nm && to && buffer_ptr && buffer_ptr > 0)
+	if (from && from->nm && to && buffer_ptr && buffer_size > 0)
 	{
-		res = 1; //network_manager_enqueue_outgoing_packet(from->nm, to, buffer_ptr, buffer_size);
-		// while ((msg = network_manager_pop_outgoing_net_msg(from->nm)))
-		// 	net_msg_send(msg);
+		res = network_manager_enqueue_outgoing_packet(from->nm, from, to, buffer_ptr, buffer_size);
+		network_shaper_update_bitrate(from->shaper, buffer_size);
 	}
 	return res >= 0 ? buffer_size : res;
 }
@@ -214,19 +278,45 @@ int send_to_peer(const struct nodeID *from, const struct nodeID *to, const uint8
 int recv_from_peer(const struct nodeID *local, struct nodeID **remote, uint8_t *buffer_ptr, int buffer_size)
 {
 	struct nodeID * node;
-	int res;
+	ssize_t res;
+	size_t data_len;
 	socklen_t len;
+	struct net_msg * msg;
+	packet_state_t pstate;
 
-	node = malloc(sizeof(struct nodeID));
-	memset(node, 0, sizeof(struct nodeID));
-	node->occurrences = 1;
-	node->fd = -1;
-	len = sizeof(struct nodeID);
+	node = empty_node();
+	len = sizeof(struct sockaddr_storage);
 
 	res = recvfrom(local->fd, buffer_ptr, buffer_size, 0, (struct sockaddr *)&(node->addr), &len);
-
-	if (res <=0 )
+	if (res > 0)
 	{
+		msg = net_msg_decode(local, node, buffer_ptr, res);
+		switch (msg->type) {
+			case NET_FRAGMENT:
+				pstate = network_manager_add_incoming_fragment(local->nm, (struct fragment *) msg);
+				if (pstate == PKT_READY)
+				{
+					data_len = buffer_size;
+					network_manager_pop_incoming_packet(local->nm, node, 
+							((struct fragment *)msg)->pid, buffer_ptr, &data_len);
+					res = data_len;
+				}
+				else
+					res = 0;
+				fragment_deinit((struct fragment *) msg);
+				free(msg);
+				break;
+			case NET_FRAGMENT_REQ:
+				network_manager_enqueue_outgoing_fragment(local->nm, node, ((struct frag_request *)msg)->pid,
+					((struct frag_request *)msg)->id);
+				res = 0;
+				frag_request_destroy((struct frag_request **)&msg);
+				break;
+			default:
+				fprintf(stderr, "[ERROR] Received weird message!\n");
+		}
+	}
+	else {
 		nodeid_free(node);
 		node = NULL;
 	}
@@ -332,6 +422,28 @@ struct nodeID *nodeid_undump(const uint8_t *b, int *len)
 	return res;
 }
 
+void net_helper_deinit(struct nodeID *s)
+{
+	if (s)
+	{
+		if (s->fd >= 0)
+		{
+			close(s->fd);
+			s->fd = -1;
+		}
+		if (s->nm)
+			network_manager_destroy(&(s->nm));
+		if (s->shaper)
+			network_shaper_destroy(&(s->shaper));
+		if (s->sending_buffer)
+		{
+			free(s->sending_buffer);
+			s->sending_buffer = NULL;
+		}
+		nodeid_free(s);
+	}
+}
+
 void nodeid_free(struct nodeID *s)
 {
 	if (s)
@@ -343,6 +455,10 @@ void nodeid_free(struct nodeID *s)
 				close(s->fd);
 			if (s->nm)
 				network_manager_destroy(&(s->nm));
+			if (s->shaper)
+				network_shaper_destroy(&(s->shaper));
+			if (s->sending_buffer)
+				free(s->sending_buffer);
 			free(s);
 		}
 	}

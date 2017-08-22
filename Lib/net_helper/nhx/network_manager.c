@@ -24,7 +24,6 @@
 #include<ord_set.h>
 #include<grapes_config.h>
 
-#define DEFAULT_FRAG_SIZE 1200
 #define DEFAULT_PKT_MAX_AGE 4
 
 

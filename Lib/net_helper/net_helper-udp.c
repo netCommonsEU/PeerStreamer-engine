@@ -201,7 +201,7 @@ int recv_from_peer(const struct nodeID *local, struct nodeID **remote, uint8_t *
 	memset(node, 0, sizeof(struct nodeID));
 	node->occurrences = 1;
 	node->fd = -1;
-	len = sizeof(struct nodeID);
+	len = sizeof(struct sockaddr_storage);
 
 	res = recvfrom(local->fd, buffer_ptr, buffer_size, 0, (struct sockaddr *)&(node->addr), &len);
 
@@ -358,4 +358,15 @@ int node_port(const struct nodeID *s)
 			break;
 	}
 	return res;
+}
+
+void net_helper_periodic(struct nodeID *s, struct timeval * interval)
+{
+	if (interval)
+		interval->tv_sec = 1000;
+}
+
+void net_helper_deinit(struct nodeID *s)
+{
+	nodeid_free(s);
 }

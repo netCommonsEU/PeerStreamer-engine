@@ -24,6 +24,7 @@
 #include<list.h>
 #include<stdint.h>
 #include<stdlib.h>
+#include<sys/socket.h>
 
 /* This module is responsible of dumping/undumping the network packets */
 
@@ -40,16 +41,8 @@ int8_t net_msg_init(struct net_msg * msg, net_msg_t type, const struct nodeID * 
 
 void net_msg_deinit(struct net_msg * msg);
 
-/* parse and store the received data from the network 
- * buffer is the pointer to the incoming data, len its length
- * returns:
- * -1 if a FRAGMENT message is received but there is no ready packet
- *   to be popped from the frag_queue
- * packet_id if a FRAGMENT message is detected and a packet is ready to be
- *   popped from the frag_queue
- * -2 if an ARQ message is received
- * -3 on error
- */
-int32_t net_msg_parse(struct nodeID * local, uint8_t * buffer, size_t len);
+ssize_t net_msg_send(int sockfd, const struct sockaddr *dest_addr, socklen_t addrlen, struct net_msg * msg, uint8_t * buff, size_t buff_len);
+
+struct net_msg * net_msg_decode(const struct nodeID *dst, const struct nodeID *src, const uint8_t * buff, size_t buff_len);
 
 #endif

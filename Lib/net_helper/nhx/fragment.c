@@ -20,6 +20,9 @@
 
 #include<fragment.h>
 #include<string.h>
+#include<stdio.h>
+
+#define FRAGMENT_HEADER_LEN (sizeof(net_msg_t) + sizeof(packet_id_t) + sizeof(frag_id_t) + sizeof(frag_id_t) + sizeof(size_t))
 
 int8_t fragment_init(struct fragment * f, const struct nodeID * from, const struct nodeID * to, packet_id_t pid, frag_id_t frag_num, frag_id_t id, const uint8_t * data, size_t data_size, struct list_head * list)
 {
@@ -61,4 +64,76 @@ struct list_head * fragment_list_element(struct fragment *f)
 	if (f)
 		return &((struct net_msg*)f)->list;
 	return NULL;
+}
+
+int8_t fragment_encode(struct fragment * frag, uint8_t * buff, size_t buff_len)
+{
+	int8_t res = -1;
+	uint8_t * ptr;
+
+	ptr = buff;
+	if (frag && buff && buff_len >= FRAGMENT_HEADER_LEN + frag->data_size)
+	{
+		*((net_msg_t*) ptr) = NET_FRAGMENT;
+		ptr += sizeof(net_msg_t);
+		*((packet_id_t*) ptr) = frag->pid;
+		ptr += sizeof(packet_id_t);
+		*((frag_id_t*) ptr) = frag->frag_num;
+		ptr += sizeof(frag_id_t);
+		*((frag_id_t*) ptr) = frag->id;
+		ptr += sizeof(frag_id_t);
+		*((size_t*) ptr) = frag->data_size;
+		ptr += sizeof(size_t);
+		memmove(ptr, frag->data, frag->data_size);
+
+		res = 0;
+	}
+	return res;
+
+}
+
+ssize_t fragment_send(int sockfd, const struct sockaddr *dest_addr, socklen_t addrlen, struct fragment * frag, uint8_t * buff, size_t buff_len)
+{
+	ssize_t res = -1;
+	ssize_t msg_len;
+
+		
+	if (dest_addr && frag && buff && buff_len >= FRAGMENT_HEADER_LEN + frag->data_size)
+	{
+		msg_len = FRAGMENT_HEADER_LEN + frag->data_size;
+		fragment_encode(frag, buff, buff_len);
+		
+		res = sendto(sockfd, buff, msg_len, MSG_CONFIRM, dest_addr, addrlen);
+	}
+	return res;
+}
+
+struct fragment * fragment_decode(const struct nodeID *dst, const struct nodeID *src, const uint8_t * buff, size_t buff_len)
+{
+	struct fragment * msg = NULL;
+	const uint8_t * ptr;
+	packet_id_t pid;
+	frag_id_t fid, frag_num;
+	size_t data_len;
+
+	if (dst && src && buff && buff_len >= FRAGMENT_HEADER_LEN)
+	{
+		ptr = buff + sizeof(net_msg_t);
+		pid = *((packet_id_t*)ptr);
+		ptr = ptr + sizeof(packet_id_t);
+		frag_num = *((frag_id_t*)ptr);
+		ptr = ptr + sizeof(frag_id_t);
+		fid = *((frag_id_t*)ptr);
+		ptr = ptr + sizeof(frag_id_t);
+		data_len = *((frag_id_t*)ptr);
+		ptr = ptr + sizeof(size_t);
+
+		if (buff_len >= FRAGMENT_HEADER_LEN + data_len)
+		{
+			msg = malloc(sizeof(struct fragment));
+			fragment_init(msg, src, dst, pid, frag_num, fid, ptr, data_len, NULL);
+		}
+	}
+
+	return msg;
 }

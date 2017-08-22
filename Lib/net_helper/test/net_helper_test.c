@@ -1,7 +1,9 @@
 #include<malloc.h>
 #include<assert.h>
 #include<string.h>
+#include<time.h>
 #include<net_helper.h>
+#include<net_helpers.h>
 
 void create_node_test()
 {
@@ -186,16 +188,18 @@ void send_recv_test()
 	struct nodeID * n1, *n2, *r;
 	char buff[80];
 	char msg[] = "ciao";
+	struct timeval interval;
 
 	n1 = net_helper_init("127.0.0.1", 6000, NULL);
 	n2 = net_helper_init("127.0.0.1", 6001, NULL);
 	send_to_peer(n1, n2, (uint8_t *)msg, 5);
+	net_helper_periodic(n1, &interval);
 	recv_from_peer(n2, &r, (uint8_t *)buff, 80);
 	assert(strcmp(msg, buff) == 0);
 	assert(nodeid_equal(r, n1));
 
-	nodeid_free(n1);
-	nodeid_free(n2);
+	net_helper_deinit(n1);
+	net_helper_deinit(n2);
 	nodeid_free(r);
 	fprintf(stderr,"%s successfully passed!\n",__func__);
 }
