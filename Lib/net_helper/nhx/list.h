@@ -88,7 +88,6 @@ static inline void __list_del(struct list_head *prev, struct list_head *next)
 /**
  * list_del - deletes entry from list.
  * @entry: the element to delete from the list.
- * Note: list_empty on entry does not return true after this, the entry is in an undefined state.
  */
 static inline void list_del(struct list_head *entry)
 {
@@ -137,6 +136,22 @@ static inline void list_move_tail(struct list_head *list,
 static inline int list_empty(struct list_head *head)
 {
 	return head->next == head;
+}
+
+/**
+ * list_merge - merge two lists
+ * the two lists are merged, list1 is followed by list2 and vice versa 
+ */
+static inline void list_merge(struct list_head *list1, struct list_head *list2)
+{
+	struct list_head *last1 = list1->prev;
+	struct list_head *last2 = list2->prev;
+
+	last1->next = list2;
+	list2->prev = last1;
+
+	list1->prev = last2;
+	last2->next = list1;
 }
 
 static inline void __list_splice(struct list_head *list,

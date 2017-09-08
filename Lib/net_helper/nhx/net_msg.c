@@ -33,7 +33,7 @@ int8_t net_msg_init(struct net_msg * msg, net_msg_t type, const struct nodeID * 
 		msg->to = nodeid_dup(to);
 		msg->from = nodeid_dup(from);
 		if (list)
-			list_add(&(msg->list), list);
+			list_add_tail(&(msg->list), list);
 		else
 			INIT_LIST_HEAD(&(msg->list));
 		res = 0;

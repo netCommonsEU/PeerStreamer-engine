@@ -93,7 +93,7 @@ int8_t network_manager_enqueue_outgoing_packet(struct network_manager *nm, const
 		if (frag_list)
 		{
 			if (nm->outqueue)
-				list_splice(nm->outqueue, frag_list);
+				list_merge(nm->outqueue, frag_list);
 			else
 				nm->outqueue = frag_list;
 			res = 0;
@@ -142,7 +142,7 @@ packet_state_t network_manager_add_incoming_fragment(struct network_manager * nm
 		if (requests)
 		{
 			if (nm->outqueue)
-				list_splice(nm->outqueue, requests);
+				list_merge(nm->outqueue, requests);
 			else
 				nm->outqueue = requests;
 		}
@@ -186,7 +186,7 @@ int8_t network_manager_enqueue_outgoing_fragment(struct network_manager *nm, con
 			{
 				res = 0;  // ok
 				if (nm->outqueue)
-					list_add(fragment_list_element(f), nm->outqueue);
+					list_add_tail(fragment_list_element(f), nm->outqueue);
 				else
 					nm->outqueue = fragment_list_element(f);
 			} else

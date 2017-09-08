@@ -78,7 +78,7 @@ struct list_head * packet_bucket_add_packet(struct packet_bucket * pb, const str
 		if (fp == insert_res)
 		{
 			if (pb->packet_list)
-				list_add(&(fp->list), pb->packet_list);
+				list_add_tail(&(fp->list), pb->packet_list);
 			else {
 				pb->packet_list = &(fp->list);
 				INIT_LIST_HEAD(pb->packet_list);
@@ -150,7 +150,7 @@ packet_state_t packet_bucket_add_fragment(struct packet_bucket *pb, const struct
 			fp = fragmented_packet_empty(f->pid, src, dst, f->frag_num);
 			ord_set_insert(pb->packet_set, fp, 0);
 			if (pb->packet_list)
-				list_add(&(fp->list), pb->packet_list);
+				list_add_tail(&(fp->list), pb->packet_list);
 			else {
 				pb->packet_list = &(fp->list);
 				INIT_LIST_HEAD(pb->packet_list);
