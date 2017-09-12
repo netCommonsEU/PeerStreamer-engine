@@ -249,7 +249,8 @@ int8_t psinstance_handle_msg(struct psinstance * ps)
 	if (len < 0) {
 		fprintf(stderr,"[ERROR] Error receiving message. Maybe larger than %d bytes\n", MSG_BUFFSIZE);
 		res = -1;
-	}else
+	}
+	if (len > 0)
 		switch (buff[0] /* Message Type */) {
 			case MSG_TYPE_TMAN:
 			case MSG_TYPE_NEIGHBOURHOOD:

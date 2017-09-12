@@ -100,7 +100,7 @@ int main(int argc, char **argv)
 
 	ps = psinstance_create(srv_ip, srv_port, config);
 	while (ps && running)
-		psinstance_poll(ps, 5000);
+		psinstance_poll(ps, 5000000);
 
 	if (config_override)
 		free(config);

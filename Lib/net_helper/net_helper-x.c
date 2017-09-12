@@ -65,13 +65,19 @@ void net_helper_send_attempt(struct nodeID *s, struct timeval *interval)
 {
 	struct net_msg * msg;
 
-	network_shaper_next_sending_interval(s->shaper, interval);
-	if (interval->tv_sec == 0 && interval->tv_usec == 0 && network_manager_outgoing_queue_ready(s->nm))
+	if (network_manager_outgoing_queue_ready(s->nm))
 	{
-		msg = network_manager_pop_outgoing_net_msg(s->nm);
-		net_helper_send_msg(s, msg);
-		network_shaper_register_sent_bytes(s->shaper, 0);
 		network_shaper_next_sending_interval(s->shaper, interval);
+		if (interval->tv_sec == 0 && interval->tv_usec == 0)
+		{
+			msg = network_manager_pop_outgoing_net_msg(s->nm);
+			net_helper_send_msg(s, msg);
+			network_shaper_register_sent_bytes(s->shaper, 0);
+			network_shaper_next_sending_interval(s->shaper, interval);
+		}
+	} else {  // in case we have an empty outqueue we have to poll it periodically...
+		interval->tv_sec = 0;
+		interval->tv_usec = 5000;
 	}
 }
 
