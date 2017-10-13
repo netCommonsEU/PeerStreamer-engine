@@ -339,3 +339,16 @@ int pstreamer_register_fds(const struct psinstance * ps, fd_register_f func, voi
 	register_network_fds(ps->my_sock, func, handler);
 	return 0;
 }
+
+suseconds_t psinstance_network_periodic(struct psinstance * ps)
+{
+	struct timeval interval;
+	suseconds_t delay = 500;
+
+	if (ps && ps->my_sock)
+	{
+		net_helper_periodic(ps->my_sock, &interval);
+		delay = interval.tv_sec * 1000 + interval.tv_usec /1000;
+	}
+	return delay;
+}

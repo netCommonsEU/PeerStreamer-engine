@@ -48,4 +48,6 @@ int8_t psinstance_topology_update(const struct psinstance * ps);
 
 suseconds_t psinstance_offer_interval(const struct psinstance * ps);
 
+suseconds_t psinstance_network_periodic(struct psinstance * ps);
+
 #endif
