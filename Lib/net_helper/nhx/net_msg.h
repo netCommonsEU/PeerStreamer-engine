@@ -28,7 +28,9 @@
 
 /* This module is responsible of dumping/undumping the network packets */
 
-typedef enum net_msg_types {NET_FRAGMENT, NET_FRAGMENT_REQ} net_msg_t;
+#define NET_FRAGMENT 0
+#define NET_FRAGMENT_REQ 1
+typedef uint8_t net_msg_t;
 
 struct net_msg {
 	net_msg_t type;

@@ -59,7 +59,7 @@ ssize_t net_msg_send(int sockfd, const struct sockaddr *dest_addr, socklen_t add
 		case NET_FRAGMENT_REQ:
 			return frag_request_send(sockfd, dest_addr, addrlen, (struct frag_request*) msg, buff, buff_len);
  		default:
- 			return -1; //sendto(sockfd, buff, buff_len, MSG_CONFIRM, dest_addr, addrlen);
+ 			return -1; 
  	}
 }
 

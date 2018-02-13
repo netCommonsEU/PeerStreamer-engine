@@ -21,6 +21,7 @@
 #include<fragment.h>
 #include<frag_request.h>
 #include<string.h>
+#include<int_coding.h>
 
 #define FRAG_REQUEST_HEADER_LEN (sizeof(net_msg_t) + sizeof(packet_id_t) + sizeof(frag_id_t))
 
@@ -62,11 +63,11 @@ int8_t frag_request_encode(struct frag_request *fr, uint8_t * buff, size_t buff_
 	if (fr && buff && buff_len >= FRAG_REQUEST_HEADER_LEN)
 	{
 		*((net_msg_t*) ptr) = NET_FRAGMENT_REQ;
-		ptr += sizeof(net_msg_t);
-		*((packet_id_t*) ptr) = fr->pid;
-		ptr += sizeof(packet_id_t);
-		*((frag_id_t*) ptr) = fr->id;
-		ptr += sizeof(frag_id_t);
+		ptr += 1;
+		int16_cpy(ptr, fr->pid);
+		ptr += 2;
+		int16_cpy(ptr, fr->id);
+		ptr += 2;
 		
 		res = 0;
 	}
@@ -95,10 +96,10 @@ struct frag_request * frag_request_decode(const struct nodeID *dst, const struct
 
 	if (dst && src && buff && buff_len >= FRAG_REQUEST_HEADER_LEN)
 	{
-		ptr = buff + sizeof(net_msg_t);
-		pid = *((packet_id_t*)ptr);
-		ptr = ptr + sizeof(packet_id_t);
-		fid = *((frag_id_t*)ptr);
+		ptr = buff + 1;
+		pid = int16_rcpy(ptr);
+		ptr = ptr + 2;
+		fid = int16_rcpy(ptr);
 		msg = frag_request_create(src, dst, pid, fid, NULL);
 	}
 

@@ -31,6 +31,7 @@
 #include <peer.h>
 #include <grapes_msg_types.h>
 #include<grapes_config.h>
+#include<int_coding.h>
 //
 #include "compatibility/timer.h"
 //
@@ -205,7 +206,8 @@ void neighbourhood_message_parse(struct topology * t, struct nodeID *from, const
 			p = neighbourhood_add_peer(t, from);
 			if (len >= (sizeof(struct metadata) + 1))
 			{
-				memmove(&m,buff+1,sizeof(struct metadata));
+				m.cb_size = int16_rcpy(buff+1);
+				m.neigh_size = buff[3];
 				peer_set_metadata(p,&m);
 			}
 			break;
@@ -318,7 +320,8 @@ int neighbourhood_send_msg(struct topology *t, const struct peer * p,uint8_t typ
 	msg = malloc(sizeof(struct metadata)+2);
 	msg[0] = MSG_TYPE_NEIGHBOURHOOD;
 	msg[1] = type;
-	memmove(msg+2,&(t->my_metadata),sizeof(struct metadata));
+	int16_cpy(msg+2, t->my_metadata.cb_size);
+	msg[4] = t->my_metadata.neigh_size;
 	res = send_to_peer(psinstance_nodeid(t->ps), p->id, msg, sizeof(struct metadata)+2);
 	free(msg);
 	return res;	

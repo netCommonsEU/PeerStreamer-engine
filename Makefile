@@ -1,5 +1,5 @@
-GRAPES ?= ../grapes
-NET_HELPER ?= Lib/net_helper
+GRAPES ?= $(PWD)/../grapes
+NET_HELPER ?= $(PWD)/Lib/net_helper
 LIBNETHELPER=$(NET_HELPER)/libnethelper.a
 LIBGRAPES=$(GRAPES)/src/libgrapes.a
 LIBPS=src/libpstreamer.a

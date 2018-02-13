@@ -21,8 +21,10 @@
 #include<fragment.h>
 #include<string.h>
 #include<stdio.h>
+#include<int_coding.h>
 
-#define FRAGMENT_HEADER_LEN (sizeof(net_msg_t) + sizeof(packet_id_t) + sizeof(frag_id_t) + sizeof(frag_id_t) + sizeof(size_t))
+// #define FRAGMENT_HEADER_LEN (sizeof(net_msg_t) + sizeof(packet_id_t) + sizeof(frag_id_t) + sizeof(frag_id_t) + sizeof(size_t))
+#define FRAGMENT_HEADER_LEN (1 + 2 + 2 + 2 + 4)
 
 int8_t fragment_init(struct fragment * f, const struct nodeID * from, const struct nodeID * to, packet_id_t pid, frag_id_t frag_num, frag_id_t id, const uint8_t * data, size_t data_size, struct list_head * list)
 {
@@ -75,15 +77,15 @@ int8_t fragment_encode(struct fragment * frag, uint8_t * buff, size_t buff_len)
 	if (frag && buff && buff_len >= FRAGMENT_HEADER_LEN + frag->data_size)
 	{
 		*((net_msg_t*) ptr) = NET_FRAGMENT;
-		ptr += sizeof(net_msg_t);
-		*((packet_id_t*) ptr) = frag->pid;
-		ptr += sizeof(packet_id_t);
-		*((frag_id_t*) ptr) = frag->frag_num;
-		ptr += sizeof(frag_id_t);
-		*((frag_id_t*) ptr) = frag->id;
-		ptr += sizeof(frag_id_t);
-		*((size_t*) ptr) = frag->data_size;
-		ptr += sizeof(size_t);
+		ptr += 1;
+		int16_cpy(ptr, frag->pid);
+		ptr += 2;
+		int16_cpy(ptr, frag->frag_num);
+		ptr += 2;
+		int16_cpy(ptr, frag->id);
+		ptr += 2;
+		int_cpy(ptr, frag->data_size);
+		ptr += 4;
 		memmove(ptr, frag->data, frag->data_size);
 
 		res = 0;
@@ -118,15 +120,15 @@ struct fragment * fragment_decode(const struct nodeID *dst, const struct nodeID 
 
 	if (dst && src && buff && buff_len >= FRAGMENT_HEADER_LEN)
 	{
-		ptr = buff + sizeof(net_msg_t);
-		pid = *((packet_id_t*)ptr);
-		ptr = ptr + sizeof(packet_id_t);
-		frag_num = *((frag_id_t*)ptr);
-		ptr = ptr + sizeof(frag_id_t);
-		fid = *((frag_id_t*)ptr);
-		ptr = ptr + sizeof(frag_id_t);
-		data_len = *((frag_id_t*)ptr);
-		ptr = ptr + sizeof(size_t);
+		ptr = buff + 1;
+		pid = int16_rcpy(ptr);
+		ptr = ptr + 2;
+		frag_num = int16_rcpy(ptr);
+		ptr = ptr + 2;
+		fid = int16_rcpy(ptr);
+		ptr = ptr + 2;
+		data_len = int_rcpy(ptr);
+		ptr = ptr + 4;
 
 		if (buff_len >= FRAGMENT_HEADER_LEN + data_len)
 		{
