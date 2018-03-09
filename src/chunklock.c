@@ -31,7 +31,6 @@
 #include "net_helper.h"
 #define LSIZE_INCREMENT 10
 
-static struct timeval toutdiff = {2, 0};
 
 struct lock {
   int chunkid;
@@ -42,6 +41,7 @@ struct lock {
 struct chunk_locks{
 	struct lock *locks;
 	size_t lsize, lcount;
+	struct timeval toutdiff;
 };
 
 void chunk_locks_destroy(struct chunk_locks ** cl)
@@ -71,32 +71,29 @@ void locks_init(struct chunk_locks * cl)
     cl->lcount = 0;
   }
 
-  if (cl->lcount == cl->lsize) {
-    cl->lsize += LSIZE_INCREMENT;
-    cl->locks = realloc(cl->locks , sizeof(struct lock) * cl->lsize);
-  }
-
   if (!cl->locks) {
     fprintf(stderr, "Error allocating memory for locks!\n");
     exit(EXIT_FAILURE);
   }
 }
 
-struct chunk_locks * chunk_locks_create()
+struct chunk_locks * chunk_locks_create(uint8_t lock_timeout)
 {
 	struct chunk_locks * cl;
 	cl = malloc(sizeof(struct chunk_locks));
 	cl->locks = NULL;
+	cl->toutdiff.tv_sec = lock_timeout;
+	cl->toutdiff.tv_usec = 0;
 
 	locks_init(cl);
 	return cl;
 }
 
-int chunk_lock_timed_out(struct lock *l)
+int chunk_lock_timed_out(struct chunk_locks *cl, struct lock *l)
 {
   struct timeval tnow,tout;
   gettimeofday(&tnow, NULL);
-  timeradd(&l->timestamp, &toutdiff, &tout);
+  timeradd(&l->timestamp, &(cl->toutdiff), &tout);
 
   return timercmp(&tnow, &tout, >);
 }
@@ -112,39 +109,53 @@ void chunk_locks_cleanup(struct chunk_locks * cl){
   int i;
 
   for (i=(cl->lcount)-1; i>=0; i--) {
-    if (chunk_lock_timed_out(cl->locks+i)) {
+    if (chunk_lock_timed_out(cl, cl->locks+i)) {
       chunk_lock_remove(cl, cl->locks+i);
     }
   }
 }
 
 void chunk_lock(struct chunk_locks * cl, int chunkid, struct peer *from){
-  cl->locks[cl->lcount].chunkid = chunkid;
-  cl->locks[cl->lcount].peer = from ? nodeid_dup(from->id) : NULL;
-  gettimeofday(&((cl->locks)[cl->lcount].timestamp), NULL);
-  cl->lcount++;
+  if (cl && from)
+  {
+	  cl->locks[cl->lcount].chunkid = chunkid;
+	  cl->locks[cl->lcount].peer = from ? nodeid_dup(from->id) : NULL;
+	  gettimeofday(&((cl->locks)[cl->lcount].timestamp), NULL);
+	  cl->lcount++;
+
+	  if (cl->lcount == cl->lsize) {
+		cl->lsize += LSIZE_INCREMENT;
+		cl->locks = realloc(cl->locks , sizeof(struct lock) * cl->lsize);
+	  }
+  }
 }
 
 void chunk_unlock(struct chunk_locks * cl, int chunkid){
   size_t i;
 
-  for (i=0; i<cl->lcount; i++) {
-    if ((cl->locks)[i].chunkid == chunkid) {
-      chunk_lock_remove(cl, (cl->locks)+i);
-      break;
-    }
+  if (cl)
+  {
+	  for (i=0; i<cl->lcount; i++) {
+		if ((cl->locks)[i].chunkid == chunkid) {
+		  chunk_lock_remove(cl, (cl->locks)+i);
+		  break;
+		}
+	  }
   }
 }
 
 int chunk_islocked(struct chunk_locks * cl, int chunkid){
   size_t i;
 
-  chunk_locks_cleanup(cl);
+  if(cl)
+  {
+	  chunk_locks_cleanup(cl);
 
-  for (i=0; i<cl->lcount; i++) {
-    if ((cl->locks)[i].chunkid == chunkid) {
-      return 1;
-    }
+	  for (i=0; i<cl->lcount; i++) {
+		if ((cl->locks)[i].chunkid == chunkid) {
+		  return 1;
+		}
+	  }
   }
   return 0;
 }

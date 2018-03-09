@@ -22,12 +22,13 @@
 #define CHUNKLOCK_H
 
 #include <peer.h>
+#include <stdint.h>
 
 struct chunk_locks;
 
-struct chunk_locks * chunk_locks_create();
+struct chunk_locks * chunk_locks_create(uint8_t lock_timeout);
 void chunk_locks_destroy(struct chunk_locks ** cl);
-void chunk_lock(struct chunk_locks * cl, int chunkid,struct peer *from);
+void chunk_lock(struct chunk_locks * cl, int chunkid, struct peer *from);
 void chunk_unlock(struct chunk_locks * cl, int chunkid);
 int chunk_islocked(struct chunk_locks * cl, int chunkid);
 
