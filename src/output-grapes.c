@@ -245,9 +245,15 @@ struct chunk_output * output_create(int bufsize, const char *config, const struc
 
 void output_destroy(struct chunk_output ** outg)
 {
+	int i;
 	if (outg && *outg)
 	{
 		buffer_flush(*outg, 0);
+
+		for (i = 0; i < (*outg)->buff_size; i++) {
+			if (((*outg)->buff)[i].data == NULL)
+				free(((*outg)->buff)[i].data);
+		}
 		if((*outg)->buff)
 			free((*outg)->buff);
 		if((*outg)->out)
