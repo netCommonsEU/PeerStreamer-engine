@@ -46,7 +46,6 @@ struct psinstance {
 	struct streaming_timers timers;
 	char * iface;
 	int port;
-	int outbuff_size;
 	int chunkbuffer_size;
 	uint8_t num_offers;
 	uint8_t chunks_per_offer;
@@ -66,7 +65,6 @@ int config_parse(struct psinstance * ps,const char * config)
 	tmp_str = grapes_config_value_str_default(tags, "iface", NULL);
 	ps->iface = tmp_str ? strdup(tmp_str) : NULL;
 	grapes_config_value_int_default(tags, "port", &(ps->port), 6000);
-	grapes_config_value_int_default(tags, "outbuff_size", &(ps->outbuff_size), 75);
 	grapes_config_value_int_default(tags, "chunkbuffer_size", &(ps->chunkbuffer_size), 50);
 	grapes_config_value_int_default(tags, "source_multiplicity", &(ps->source_multiplicity), 3);
 
@@ -79,7 +77,7 @@ int config_parse(struct psinstance * ps,const char * config)
 	return 0;
 }
 
-int node_init(struct psinstance * ps)
+int node_init(struct psinstance * ps, const char * config)
 {
 	char * my_addr;
 
@@ -92,7 +90,7 @@ int node_init(struct psinstance * ps)
 		fprintf(stderr, "[ERROR] cannot get a valid ip address\n");
 		return -1;
 	}
-	ps->my_sock = net_helper_init(my_addr, ps->port, "");
+	ps->my_sock = net_helper_init(my_addr, ps->port, config);
 	free(my_addr);
 
 	if (ps->my_sock)
@@ -117,7 +115,7 @@ struct psinstance * psinstance_create(const char * srv_ip, const int srv_port, c
 		ps->chunk_time_interval = 0;
 		ps->chunk_offer_interval = 1000000/25;  // microseconds divided by frame (chunks) per second
 		config_parse(ps, config);
-		res = node_init(ps);
+		res = node_init(ps, config);
 		if (res == 0)
 		{
 			ps->measure = measures_create(nodeid_static_str(ps->my_sock));
@@ -132,7 +130,7 @@ struct psinstance * psinstance_create(const char * srv_ip, const int srv_port, c
 					ps->inc.fds[0] = -1;
 					ps->streaming = streaming_create(ps, NULL, config);
 					topology_node_insert(ps->topology, srv);
-					ps->chunk_out = output_create(ps->outbuff_size, config, ps);
+					ps->chunk_out = output_create(ps->measure, config);
 					nodeid_free(srv);
 				} else
 					psinstance_destroy(&ps);

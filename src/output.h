@@ -28,8 +28,10 @@
 
 struct chunk_output;
 
-struct chunk_output * output_create(int bufsize, const char *config, const struct psinstance * ps);
-void output_deliver(struct chunk_output* outg, const struct chunk *c);
+struct chunk_output * output_create(struct measures * ms, const char *config);
+
+int output_deliver(struct chunk_output* outg, const struct chunk *c);
+
 void output_destroy(struct chunk_output** outg);
 
 #endif	/* OUTPUT_H */

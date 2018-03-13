@@ -164,6 +164,5 @@ int sigParseData(const struct psinstance * ps, struct nodeID *fromid, uint8_t *b
           ret = -1;
     }
     chunkID_set_free(c_set);
-    nodeid_free(ownerid);
     return ret;
 }

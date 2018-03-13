@@ -56,7 +56,10 @@ void fragment_deinit(struct fragment * f)
 	if (f)
 	{
 		if(f->data)
+		{
 			free(f->data);
+			f->data = NULL;
+		}
 		net_msg_deinit((struct net_msg *) f);
 	}
 }

@@ -1,6 +1,4 @@
 /*
- * Copyright (c) 2010-2011 Luca Abeni
- * Copyright (c) 2010-2011 Csaba Kiraly
  * Copyright (c) 2017 Luca Baldesi
  *
  * This file is part of PeerStreamer.
@@ -30,234 +28,163 @@
 #include <chunkiser.h>
 #include <psinstance_internal.h>
 #include <measures.h>
+#include<grapes_config.h>
 
 #include "output.h"
 #include "dbg.h"
 
+
 struct chunk_output {
-	int last_chunk;
-	int next_chunk;
-	int buff_size;
-	int start_id;
-	int end_id;
-	
-	char sflag;
-	char eflag;
 	struct chunk *buff;
 	struct output_stream *out;
-	const struct psinstance * ps;
-	
-	bool reorder; 
+	struct measures * measure;
+
+	uint16_t buff_length;
+	uint16_t head;
+	uint8_t  reorder;
+	int next_out;
 };
 
-//struct outbuf {
-//  struct chunk c;
-//};
-//static struct outbuf *buff;
-//static struct output_stream *out;
-
-
-void output_init(struct chunk_output * outg, int bufsize, const char *config)
+void chunk_clone(struct chunk * dst, const struct chunk* src)
 {
-  //char * c;
-
-  // c = strchr(config,',');  // this is actually ignored
-  // if (c) {
-  //   *(c++) = 0;
-  // }
-  outg->out = out_stream_init("/dev/stdout", config);
-  if (outg->out == NULL) {
-     fprintf(stderr, "Error: can't initialize output module\n");
-     exit(1);
-  }
-  if (!outg->buff) {
-    int i;
-
-    outg->buff_size = bufsize;
-    outg->buff = malloc(sizeof(struct chunk) * outg->buff_size);
-    if (!outg->buff) {
-     fprintf(stderr, "Error: can't allocate output buffer\n");
-     exit(1);
-    }
-    for (i = 0; i < outg->buff_size; i++) {
-      (outg->buff)[i].data = NULL;
-    }
-  } else {
-   fprintf(stderr, "Error: output buffer re-init not allowed!\n");
-   exit(1);
-  }
-	outg->last_chunk = -1;
-	outg->next_chunk = -1;
-	outg->sflag = 0;
-	outg->eflag = 0;
-	outg->start_id = -1;
-	outg->end_id = -1;
-	outg->reorder = true; // should be zero if using chunkstream (legacy code from PeerStreamer)
+	dst->id = src->id;
+	dst->size = src->size;
+	dst->data = malloc(dst->size);
+	memmove(dst->data, src->data, dst->size);
 }
 
-static void buffer_print(const struct chunk_output * outg)
+void chunk_deinit(struct chunk * c)
 {
-#ifdef DEBUG
-  int i;
-
-  if (outg->next_chunk < 0) {
-    return;
-  }
-
-  dprintf("\toutbuf: %d-> ",outg->next_chunk);
-  for (i = outg->next_chunk; i < outg->next_chunk + outg->buff_size; i++) {
-    if (outg->buff[i % outg->buff_size].data) {
-      dprintf("%d",i % 10);
-    } else {
-      dprintf(".");
-    }
-  }
-  dprintf("\n");
-#endif
+	if (c->id >= 0)
+		free(c->data);
+	c->id = -1;
 }
 
-static void buffer_free(struct chunk_output * outg, int i)
+struct chunk_output * output_create(struct measures * ms, const char *config)
 {
-  dprintf("\t\tFlush Buf %d: %s\n", i, outg->buff[i].data);
-  if(outg->start_id == -1 || outg->buff[i].id >= outg->start_id) {
-    if(outg->end_id == -1 || outg->buff[i].id <= outg->end_id) {
-      if(outg->sflag == 0) {
-        fprintf(stderr, "\nFirst chunk id played out: %d\n\n",outg->buff[i].id);
-        outg->sflag = 1;
-      }
-      if (outg->reorder) chunk_write(outg->out, &(outg->buff[i]));
-      outg->last_chunk = outg->buff[i].id;
-    } else if (outg->eflag == 0 && outg->last_chunk != -1) {
-      fprintf(stderr, "\nLast chunk id played out: %d\n\n", outg->last_chunk);
-      outg->eflag = 1;
-    }
-  }
-
-  free(outg->buff[i].data);
-  outg->buff[i].data = NULL;
-  dprintf("Next Chunk: %d -> %d\n", outg->next_chunk, outg->buff[i].id + 1);
-  reg_chunk_playout(psinstance_measures(outg->ps), outg->buff[i].id, true, outg->buff[i].timestamp);
-  outg->next_chunk = outg->buff[i].id + 1;
-}
-
-static void buffer_flush(struct chunk_output * outg, int id)
-{
-  int i = id % outg->buff_size;
-
-  while(outg->buff[i].data) {
-    buffer_free(outg, i);
-    i = (i + 1) % outg->buff_size;
-    if (i == id % outg->buff_size) {
-      break;
-    }
-  }
-}
-
-void output_deliver(struct chunk_output * outg, const struct chunk *c)
-{
-  if (!outg->buff) {
-    fprintf(stderr, "Warning: buff not initialized!!! Setting output buffer to 8\n");
-  }
-
-  if (!outg->reorder) chunk_write(outg->out, c);
-
-  dprintf("Chunk %d delivered\n", c->id);
-  buffer_print(outg);
-  if (c->id < outg->next_chunk) {
-    return;
-  }
-
-  /* Initialize buffer with first chunk */
-  if (outg->next_chunk == -1) {
-    outg->next_chunk = c->id; // FIXME: could be anything between c->id and (c->id - buff_size + 1 > 0) ? c->id - buff_size + 1 : 0
-    fprintf(stderr,"First RX Chunk ID: %d\n", c->id);
-  }
-
-  if (c->id >= outg->next_chunk + outg->buff_size) {
-    int i;
-
-    /* We might need some space for storing this chunk,
-     * or the stored chunks are too old
-     */
-    for (i = outg->next_chunk; i <= c->id - outg->buff_size; i++) {
-      if (outg->buff[i % outg->buff_size].data) {
-        buffer_free(outg, i % outg->buff_size);
-      } else {
-        reg_chunk_playout(psinstance_measures(outg->ps), c->id, false, c->timestamp); // FIXME: some chunks could be counted as lost at the beginning, depending on the initialization of next_chunk
-        outg->next_chunk++;
-      }
-    }
-    buffer_flush(outg, outg->next_chunk);
-    dprintf("Next is now %d, chunk is %d\n", outg->next_chunk, c->id);
-  }
-
-  dprintf("%d == %d?\n", c->id, outg->next_chunk);
-  if (c->id == outg->next_chunk) {
-    dprintf("\tOut Chunk[%d] - %d: %s\n", c->id, c->id % outg->buff_size, c->data);
-
-    if(outg->start_id == -1 || c->id >= outg->start_id) {
-      if(outg->end_id == -1 || c->id <= outg->end_id) {
-        if(outg->sflag == 0) {
-          fprintf(stderr, "\nFirst chunk id played out: %d\n\n",c->id);
-          outg->sflag = 1;
-        }
-        if (outg->reorder) chunk_write(outg->out, c);
-        outg->last_chunk = c->id;
-      } else if (outg->eflag == 0 && outg->last_chunk != -1) {
-        fprintf(stderr, "\nLast chunk id played out: %d\n\n", outg->last_chunk);
-        outg->eflag = 1;
-      }
-    }
-    reg_chunk_playout(psinstance_measures(outg->ps), c->id, true, c->timestamp);
-    outg->next_chunk++;
-    buffer_flush(outg, outg->next_chunk);
-  } else {
-    dprintf("Storing %d (in %d)\n", c->id, c->id % outg->buff_size);
-    if (outg->buff[c->id % outg->buff_size].data) {
-      if (outg->buff[c->id % outg->buff_size].id == c->id) {
-        /* Duplicate of a stored chunk */
-        dprintf("\tDuplicate!\n");
-        reg_chunk_duplicate(psinstance_measures(outg->ps));
-        return;
-      }
-      fprintf(stderr, "Crap!, chunkid:%d, storedid: %d\n", c->id, outg->buff[c->id % outg->buff_size].id);
-      exit(-1);
-    }
-    /* We previously flushed, so we know that c->id is free */
-    memcpy(&(outg->buff[c->id % outg->buff_size]), c, sizeof(struct chunk));
-    outg->buff[c->id % outg->buff_size].data = malloc(c->size);
-    memcpy(outg->buff[c->id % outg->buff_size].data, c->data, c->size);
-  }
-}
-
-struct chunk_output * output_create(int bufsize, const char *config, const struct psinstance * ps)
-{
-	struct chunk_output * outg;
+	struct chunk_output * outg = NULL;
+	struct tag * tags;
+	int i, len;
 
 	outg = malloc(sizeof(struct chunk_output));
-	outg->ps = ps;
+	outg->measure = ms;
 	outg->buff = NULL;
 	outg->out = NULL;
-	output_init(outg, bufsize, config);
+	outg->next_out = -1;
+	outg->head = 0;
+
+	tags = grapes_config_parse(config);
+	grapes_config_value_int_default(tags, "outbuff_length", &len, 75);
+	outg->buff_length = len > 0 ? len : 75;
+	grapes_config_value_int_default(tags, "outbuff_reorder", &len, 1);
+	outg->reorder = len ? 1 : 0;
+	free(tags);
+
+
+	outg->buff = (struct chunk *) malloc(outg->buff_length * sizeof(struct chunk));
+	for (i=0; i<outg->buff_length; i++)
+		(outg->buff)[i].id = -1;
+	outg->out = out_stream_init("/dev/stdout", config);
+
+	if (outg->out == NULL)
+		output_destroy(&outg);
 
 	return outg;
+}
+
+void output_buffer_print(struct chunk_output * co)
+{
+	uint16_t i;
+
+	fprintf(stderr, "[");
+	for(i=0; i<co->buff_length; i++)
+		fprintf(stderr, "| %d |", co->buff[i].id);
+	fprintf(stderr, "]\n");
 }
 
 void output_destroy(struct chunk_output ** outg)
 {
 	int i;
+
 	if (outg && *outg)
 	{
-		buffer_flush(*outg, 0);
-
-		for (i = 0; i < (*outg)->buff_size; i++) {
-			if (((*outg)->buff)[i].data == NULL)
-				free(((*outg)->buff)[i].data);
-		}
 		if((*outg)->buff)
+		{
+			for (i=0; i<(*outg)->buff_length; i++)
+				chunk_deinit(&(((*outg)->buff)[i]));
 			free((*outg)->buff);
+		}
 		if((*outg)->out)
 			out_stream_close((*outg)->out);
 		free(*outg);
+		*outg = NULL;
 	}
+}
+
+int output_send_next(struct chunk_output * outg)
+{
+	int res = 0;
+	if ((outg->buff)[outg->head].id >= 0)
+	{
+		chunk_write(outg->out, &((outg->buff)[outg->head]));
+		res = 1;
+		chunk_deinit(&((outg->buff)[outg->head]));
+	}
+	outg->next_out++;
+	outg->head = (outg->head + 1) % outg->buff_length;
+	return res;
+}
+
+int output_buff_flush(struct chunk_output * outg, int len)
+{
+	int i, res = 0;
+
+	for(i=0; i<len; i++)
+		res += output_send_next(outg);
+
+	return res;
+}
+
+int output_deliver(struct chunk_output* outg, const struct chunk *c)
+/* returns the number of of chunks sent out or -1 if chunks was too late or corrupted */
+{
+	int res = -1;
+	int new_pos;
+
+	if (outg && c)
+	{
+		res = 0;
+		if (outg->reorder)
+		{
+			if (c->id >= outg->next_out)
+			{
+				if (outg->next_out < 0)	// case we have not initialized yet
+					outg->next_out = c->id;
+
+				// we make sure packet fits
+				new_pos = (outg->head + c->id - outg->next_out) % outg->buff_length;
+				if (c->id >= outg->next_out + outg->buff_length) // we need to free space
+				{
+					res += output_buff_flush(outg, c->id - outg->next_out - outg->buff_length + 1);
+					outg->head = (new_pos + 1) % outg->buff_length;
+				}
+
+
+				// we place the packet
+				chunk_clone(&(outg->buff[new_pos]), c);
+
+				// we flush everygthing possible
+				while(outg->buff[outg->head].id >= 0)
+					res += output_send_next(outg);
+
+				// output_buffer_print(outg);
+			}
+			
+		} else {
+			chunk_write(outg->out, c);
+			res++;
+		}
+	}
+
+	return res;
 }

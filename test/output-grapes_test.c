@@ -1,0 +1,234 @@
+#include<malloc.h>
+#include<assert.h>
+#include<output.h>
+#include<chunk.h>
+#include<string.h>
+
+
+struct chunk * create_chunk(int id)
+{
+	struct chunk * c;
+	char msg[80];
+
+	sprintf(msg, "ciao - %d", id);
+
+	c = malloc(sizeof(struct chunk));
+	c->id = id;
+	c->timestamp = 2;
+	c->attributes = NULL;
+	c->attributes_size = 0;
+	c->data = (uint8_t *) strdup(msg);
+	c->size = strlen((char *) c->data);
+	return c;
+}
+
+void destroy_chunk(struct chunk **c)
+{
+	if (c && *c)
+	{
+		free((*c)->data);
+		free(*c);
+		*c = NULL;
+	}
+}
+
+void output_create_test()
+{
+	struct chunk_output * co;
+	struct measures * m;
+
+	m = measures_create("dump");
+
+	co = output_create(NULL, NULL);
+	assert(co);
+	output_destroy(&co);
+	assert(co == NULL);
+
+	co = output_create(NULL, "dechunkiser=dummy");
+	assert(co);
+	output_destroy(&co);
+	assert(co == NULL);
+
+	co = output_create(m, "dechunkiser=dummy");
+	assert(co);
+	output_destroy(&co);
+	assert(co == NULL);
+
+	measures_destroy(&m);
+
+	fprintf(stderr,"%s successfully passed!\n",__func__);
+}
+
+void output_deliver_test()
+{
+	struct chunk * c;
+	struct chunk_output * outg;
+
+	c = create_chunk(1);
+	outg = output_create(NULL, "dechunkiser=dummy");
+
+	output_deliver(NULL, NULL);
+	output_deliver(outg, NULL);
+	output_deliver(outg, c);
+	destroy_chunk(&c);
+
+	c = create_chunk(2);
+	output_deliver(outg, c);
+	destroy_chunk(&c);
+
+	c = create_chunk(5);
+	output_deliver(outg, c);
+	destroy_chunk(&c);
+
+	c = create_chunk(3);
+	output_deliver(outg, c);
+	destroy_chunk(&c);
+
+	c = create_chunk(4);
+	output_deliver(outg, c);
+	destroy_chunk(&c);
+
+	output_destroy(&outg);
+
+	fprintf(stderr,"%s successfully passed!\n",__func__);
+}
+
+void output_reordering_test()
+{
+	struct chunk * c;
+	struct chunk_output * outg;
+	int res;
+
+	outg = output_create(NULL, "dechunkiser=dummy,outbuff_length=3");
+
+	c = create_chunk(4);
+	res = output_deliver(outg, c);
+	assert(res == 1);
+	destroy_chunk(&c);
+
+	c = create_chunk(3);
+	res = output_deliver(outg, c);
+	assert(res == 0);
+	destroy_chunk(&c);
+
+	c = create_chunk(6);
+	res = output_deliver(outg, c);
+	assert(res == 0);
+	destroy_chunk(&c);
+
+	c = create_chunk(5);
+	res = output_deliver(outg, c);
+	assert(res == 2);
+	destroy_chunk(&c);
+
+	c = create_chunk(15);
+	res = output_deliver(outg, c);
+	assert(res == 0);
+	destroy_chunk(&c);
+
+	c = create_chunk(18);
+	res = output_deliver(outg, c);
+	assert(res == 1);
+	destroy_chunk(&c);
+
+	output_destroy(&outg);
+
+	fprintf(stderr,"%s successfully passed!\n",__func__);
+}
+
+void output_reordering2_test()
+{
+	struct chunk * c;
+	struct chunk_output * outg;
+	int res;
+
+	outg = output_create(NULL, "dechunkiser=dummy,outbuff_length=4");
+
+	c = create_chunk(4);
+	res = output_deliver(outg, c);
+	assert(res == 1);
+	destroy_chunk(&c);
+
+	c = create_chunk(6);
+	res = output_deliver(outg, c);
+	assert(res == 0);
+	destroy_chunk(&c);
+
+	c = create_chunk(8);
+	res = output_deliver(outg, c);
+	assert(res == 0);
+	destroy_chunk(&c);
+
+	c = create_chunk(10);
+	res = output_deliver(outg, c);
+	assert(res == 1);
+	destroy_chunk(&c);
+
+	c = create_chunk(9);
+	res = output_deliver(outg, c);
+	assert(res == 0);
+	destroy_chunk(&c);
+
+	c = create_chunk(7);
+	res = output_deliver(outg, c);
+	assert(res == 4);
+	destroy_chunk(&c);
+
+	output_destroy(&outg);
+
+	fprintf(stderr,"%s successfully passed!\n",__func__);
+}
+
+void output_noreordering_test()
+{
+	struct chunk * c;
+	struct chunk_output * outg;
+	int res;
+
+	outg = output_create(NULL, "outbuff_reorder=0,dechunkiser=dummy,outbuff_length=3");
+
+	c = create_chunk(4);
+	res = output_deliver(outg, c);
+	assert(res == 1);
+	destroy_chunk(&c);
+
+	c = create_chunk(3);
+	res = output_deliver(outg, c);
+	assert(res == 1);
+	destroy_chunk(&c);
+
+	c = create_chunk(6);
+	res = output_deliver(outg, c);
+	assert(res == 1);
+	destroy_chunk(&c);
+
+	c = create_chunk(5);
+	res = output_deliver(outg, c);
+	assert(res == 1);
+	destroy_chunk(&c);
+
+	c = create_chunk(15);
+	res = output_deliver(outg, c);
+	assert(res == 1);
+	destroy_chunk(&c);
+
+	c = create_chunk(18);
+	res = output_deliver(outg, c);
+	assert(res == 1);
+	destroy_chunk(&c);
+
+	output_destroy(&outg);
+
+	fprintf(stderr,"%s successfully passed!\n",__func__);
+}
+
+int main()
+{
+	output_create_test();
+	output_deliver_test();
+	output_reordering_test();
+	output_reordering2_test();
+	output_noreordering_test();
+	return 0;
+}
+
