@@ -23,12 +23,13 @@
 #include<endpoint.h>
 #include<ord_set.h>
 #include<grapes_config.h>
+#include<frag_request.h>
 
 #define DEFAULT_PKT_MAX_AGE 4
 
 
 struct network_manager {
-	struct list_head * outqueue;
+	struct list_head outqueue;
 	struct ord_set * endpoints;
 	size_t frag_size;
 	uint16_t max_pkt_age; // in seconds
@@ -44,7 +45,7 @@ struct network_manager * network_manager_create(const char * config)
 
 	nm = malloc(sizeof(struct network_manager));
 	nm->endpoints = ord_set_new(10, endpoint_cmp);
-	nm->outqueue = NULL;
+	INIT_LIST_HEAD(&(nm->outqueue));
 
 	if (config)
 	{
@@ -61,6 +62,8 @@ struct network_manager * network_manager_create(const char * config)
 void network_manager_destroy(struct network_manager ** nm)
 {
 	void * e, * tmp;
+	struct list_head *pos, *next;
+	struct frag_request * fr;
 
 	if (nm && *nm)
 	{
@@ -69,9 +72,30 @@ void network_manager_destroy(struct network_manager ** nm)
 			ord_set_remove((*nm)->endpoints, (void *) e, 0);
 			endpoint_destroy((struct endpoint **)&e);	
 		}
+
+		list_for_each_safe(pos, next, &((*nm)->outqueue))
+		{
+				fr = (struct frag_request *) list_entry(pos, struct net_msg, list);
+				frag_request_destroy(&fr);
+		}
+
 		ord_set_destroy(&((*nm)->endpoints), 0);
 		free(*nm);
 		*nm = NULL;
+	}
+}
+
+void network_manager_print_outqueue(const struct network_manager *nm)
+{
+	struct list_head * pos;
+	struct fragment * msg;
+	uint16_t i=0;
+
+	fprintf(stderr, "=== Outqueue ===\n");
+	list_for_each(pos, &(nm->outqueue))
+	{	
+		msg = (struct fragment *) list_entry(pos, struct net_msg, list);
+		fprintf(stderr, "%d) frag_id = %d\n", i++, msg->id); 
 	}
 }
 
@@ -92,10 +116,8 @@ int8_t network_manager_enqueue_outgoing_packet(struct network_manager *nm, const
 		frag_list = endpoint_enqueue_outgoing_packet(e, src, data, data_len);
 		if (frag_list)
 		{
-			if (nm->outqueue)
-				list_merge(nm->outqueue, frag_list);
-			else
-				nm->outqueue = frag_list;
+			list_splice(frag_list, &(nm->outqueue));
+			free(frag_list);
 			res = 0;
 		}
 	}
@@ -111,13 +133,9 @@ struct net_msg * network_manager_pop_outgoing_net_msg(struct network_manager *nm
 
 	if (nm)
 	{
-		el = nm->outqueue;
+		el = list_pop(&(nm->outqueue));
 		if (el)
-		{
-			nm->outqueue = el->next != el ? el->next : NULL;
-			list_del(el);
 			m = list_entry(el, struct net_msg, list);
-		}
 	}
 	return m;
 }
@@ -125,7 +143,7 @@ struct net_msg * network_manager_pop_outgoing_net_msg(struct network_manager *nm
 packet_state_t network_manager_add_incoming_fragment(struct network_manager * nm, const struct fragment * f)
 {
 	packet_state_t res = PKT_ERROR;
-	struct list_head * requests = NULL;
+	struct list_head requests;
 	struct endpoint * e;
 	const struct nodeID * from;
 
@@ -138,15 +156,9 @@ packet_state_t network_manager_add_incoming_fragment(struct network_manager * nm
 			e = endpoint_create(from, nm->frag_size, nm->max_pkt_age);
 			ord_set_insert(nm->endpoints, (void *)e, 0);
 		}
+		INIT_LIST_HEAD(&requests);
 		res = endpoint_add_incoming_fragment(e, f, &requests);
-		if (requests)
-		{
-			if (nm->outqueue)
-				list_merge(nm->outqueue, requests);
-			else
-				nm->outqueue = requests;
-		}
-
+		list_splice(&requests, &(nm->outqueue));
 	}
 	return res;
 }
@@ -182,13 +194,10 @@ int8_t network_manager_enqueue_outgoing_fragment(struct network_manager *nm, con
 			f = endpoint_get_outgoing_fragment(e, id, fid);
 		if (f)
 		{
-			if (list_empty(fragment_list_element(f)))
+			if (list_element_notadded(fragment_list_element(f)))
 			{
 				res = 0;  // ok
-				if (nm->outqueue)
-					list_add_tail(fragment_list_element(f), nm->outqueue);
-				else
-					nm->outqueue = fragment_list_element(f);
+				list_add_tail(fragment_list_element(f), &(nm->outqueue));
 			} else
 				res = 1;  // fragment already in sending queue
 		}
@@ -199,7 +208,7 @@ int8_t network_manager_enqueue_outgoing_fragment(struct network_manager *nm, con
 
 int8_t network_manager_outgoing_queue_ready(struct network_manager *nm)
 {
-	if (nm && nm->outqueue)
+	if (nm && !list_empty(&(nm->outqueue)))
 		return 1;
 	return 0;
 }

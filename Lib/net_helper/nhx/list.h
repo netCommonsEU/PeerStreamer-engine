@@ -91,9 +91,10 @@ static inline void __list_del(struct list_head *prev, struct list_head *next)
  */
 static inline void list_del(struct list_head *entry)
 {
-	__list_del(entry->prev, entry->next);
-	entry->next = (void *) entry;
-	entry->prev = (void *) entry;
+	if (entry->prev && entry->next)
+		__list_del(entry->prev, entry->next);
+	entry->next = (void *) 0;
+	entry->prev = (void *) 0;
 }
 
 /**
@@ -140,18 +141,16 @@ static inline int list_empty(struct list_head *head)
 
 /**
  * list_merge - merge two lists
- * the two lists are merged, list1 is followed by list2 and vice versa 
+ * the two lists are merged, src is appended to dst 
  */
-static inline void list_merge(struct list_head *list1, struct list_head *list2)
+static inline void list_merge(struct list_head *dst, struct list_head *src)
 {
-	struct list_head *last1 = list1->prev;
-	struct list_head *last2 = list2->prev;
+	struct list_head *dst_last = dst->prev;
+	struct list_head *src_last = src->prev;
 
-	last1->next = list2;
-	list2->prev = last1;
-
-	list1->prev = last2;
-	last2->next = list1;
+	src_last->next = dst_last->next;
+	dst_last->next = src->next; 
+	(src->next)->prev = dst_last;
 }
 
 static inline void __list_splice(struct list_head *list,
@@ -255,5 +254,21 @@ static inline void list_splice_init(struct list_head *list,
 	     &pos->member != (head); 					\
 	     pos = n, n = list_entry(n->member.next, typeof(*n), member))
 
+static inline struct list_head * list_pop(struct list_head * head)
+{
+	struct list_head * pos = (void *) 0;
+
+	if (head && !list_empty(head))
+	{
+		pos = head->next;
+		list_del(pos);
+	}
+	return pos;
+}
+
+static inline char list_element_notadded(struct list_head * el)
+{
+	return el->next ? 0 : 1;
+}
 
 #endif

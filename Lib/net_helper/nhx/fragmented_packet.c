@@ -41,11 +41,10 @@ packet_id_t fragmented_packet_id(const struct fragmented_packet *fp)
 	return 0;
 }
 
-struct fragmented_packet * fragmented_packet_create(packet_id_t id, const struct nodeID * from, const struct nodeID *to, const uint8_t * data, size_t data_size, size_t frag_size, struct list_head ** msgs)
+struct fragmented_packet * fragmented_packet_create(packet_id_t id, const struct nodeID * from, const struct nodeID *to, const uint8_t * data, size_t data_size, size_t frag_size, struct list_head * msgs)
 {
 	struct fragmented_packet * fp = NULL;
 	const uint8_t * data_ptr = data;
-	struct list_head * list = NULL;
 	frag_id_t i;
 
 	if (data && data_size > 0 && frag_size > 0)
@@ -62,13 +61,10 @@ struct fragmented_packet * fragmented_packet_create(packet_id_t id, const struct
 		fp->frags = malloc(sizeof(struct fragment) * fp->frag_num);
 		for (i = 0; i < fp->frag_num; i++)
 		{
-			fragment_init(&(fp->frags[i]), from, to, id, fp->frag_num, i, data+(i*frag_size), MIN(frag_size, data_size), list);
+			fragment_init(&(fp->frags[i]), from, to, id, fp->frag_num, i, data+(i*frag_size), MIN(frag_size, data_size), msgs);
 			data_ptr += frag_size; 
 			data_size -= frag_size;
-			if (i == 0)
-				list = fragment_list_element(&(fp->frags[i]));
 		}
-		*msgs = list;
 	}
 	return fp;
 }
@@ -103,11 +99,10 @@ struct fragmented_packet * fragmented_packet_empty(packet_id_t pid, const struct
 	return fp;
 }
 
-packet_state_t fragmented_packet_state(struct fragmented_packet *fp, const struct nodeID *from, const struct nodeID *to, struct list_head ** requests)
+packet_state_t fragmented_packet_state(struct fragmented_packet *fp, const struct nodeID *from, const struct nodeID *to, struct list_head * requests)
 {
 	packet_state_t res = PKT_READY;
 	frag_id_t i, j, last = 0;
-	struct frag_request * fr;
 
 	for(i=0, j=fp->frag_num - 1; i < fp->frag_num; i++)
 	{
@@ -116,11 +111,7 @@ packet_state_t fragmented_packet_state(struct fragmented_packet *fp, const struc
 			if (res == PKT_READY)
 				res = PKT_LOADING;
 			if (last != 0 || j-i == 0)
-			{
-				fr = frag_request_create(from, to, fp->packet_id, j-i, *requests);
-				if (*requests == NULL)
-					*requests = frag_request_list_element(fr);
-			}
+				frag_request_create(from, to, fp->packet_id, j-i, requests);
 		} else
 			if (last == 0)
 				last = j-i;
@@ -129,7 +120,7 @@ packet_state_t fragmented_packet_state(struct fragmented_packet *fp, const struc
 	return res;
 }
 
-packet_state_t fragmented_packet_write_fragment(struct fragmented_packet *fp, const struct fragment *f, struct list_head ** requests)
+packet_state_t fragmented_packet_write_fragment(struct fragmented_packet *fp, const struct fragment *f, struct list_head * requests)
 {
 	packet_state_t res = PKT_ERROR;
 	struct fragment * nf;

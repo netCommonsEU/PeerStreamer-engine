@@ -37,11 +37,11 @@ void net_helper_init_test()
 
 	node = net_helper_init("127.0.0.1", 6000, NULL);
 	assert(node);
-	nodeid_free(node);
+	net_helper_deinit(node);
 
 	node = net_helper_init("::1", 6000, NULL);
 	assert(node);
-	nodeid_free(node);
+	net_helper_deinit(node);
 
 	fprintf(stderr,"%s successfully passed!\n",__func__);
 }

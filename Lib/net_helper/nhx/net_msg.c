@@ -22,6 +22,7 @@
 #include<fragment.h>
 #include<frag_request.h>
 #include<net_helper.h>
+#include<string.h>
 
 int8_t net_msg_init(struct net_msg * msg, net_msg_t type, const struct nodeID * from, const struct nodeID * to, struct list_head *list)
 {
@@ -35,7 +36,8 @@ int8_t net_msg_init(struct net_msg * msg, net_msg_t type, const struct nodeID * 
 		if (list)
 			list_add_tail(&(msg->list), list);
 		else
-			INIT_LIST_HEAD(&(msg->list));
+			memset(&(msg->list), 0, sizeof(struct list_head));
+
 		res = 0;
 
 	}

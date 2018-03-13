@@ -2,7 +2,7 @@ SRC=$(wildcard *.c)
 OBJS=$(SRC:.c=.test)
 
 GRAPES ?= $(PWD)/../../grapes
-NET_HELPER ?= ../Lib/net_helper
+NET_HELPER ?= $(PWD)/../Lib/net_helper
 
 TARGET=../src/libpstreamer.a
 TARGET_SRC=$(wildcard ../src/*.c)
@@ -16,7 +16,7 @@ LDFLAGS += -l pstreamer -L ../src -lnethelper -L$(NET_HELPER) -lgrapes -L $(GRAP
 all: $(TARGET) $(OBJS)
 
 $(TARGET): $(NETHELPERLIB) $(TARGET_SRC) $(GRAPESLIB)
-	DEBUG=1 GRAPES=$(GRAPES) $(MAKE) -C ../
+	DEBUG=1 NET_HELPER=$(NET_HELPER) GRAPES=$(GRAPES) $(MAKE) -C ../
 
 $(GRAPESLIB):
 	$(MAKE) -C $(GRAPES)

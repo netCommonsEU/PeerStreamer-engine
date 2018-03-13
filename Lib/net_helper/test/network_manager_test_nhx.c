@@ -1,6 +1,7 @@
 #include<malloc.h>
 #include<assert.h>
 #include<string.h>
+#include<unistd.h>
 #include<network_manager.h>
 #include<frag_request.h>
 
@@ -283,6 +284,36 @@ void network_manager_enqueue_outgoing_fragment_test()
 	fprintf(stderr,"%s successfully passed!\n",__func__);
 }
 
+void network_manager_pkt_expiring_test()
+{
+	struct network_manager *nm = NULL;
+	struct nodeID *src, *dst;
+	struct fragment f;
+	packet_state_t res;
+
+	nm = network_manager_create("max_pkt_age=1");
+	src = create_node("10.0.0.1", 6000);
+	dst = create_node("10.0.0.2", 6000);
+
+	fragment_init(&f, src, dst, 0, 2, 0, (uint8_t *)"ci", 2, NULL);
+	res = network_manager_add_incoming_fragment(nm, &f);
+	fragment_deinit(&f);
+	assert(res == PKT_LOADING);
+
+	sleep(1);
+
+	fragment_init(&f, src, dst, 0, 2, 1, (uint8_t *)"ao", 3, NULL);
+	res = network_manager_add_incoming_fragment(nm, &f);
+	fragment_deinit(&f);
+	assert(res == PKT_LOADING);
+	
+	network_manager_destroy(&nm);
+	nodeid_free(src);
+	nodeid_free(dst);
+
+	fprintf(stderr,"%s successfully passed!\n",__func__);
+}
+
 int main()
 {
 	network_manager_create_test();
@@ -292,5 +323,6 @@ int main()
 	network_manager_pop_incoming_packet_test();
 	network_manager_enqueue_outgoing_fragment_test();
 	network_manager_add_redundant_fragment_test();
+	network_manager_pkt_expiring_test();
 	return 0;
 }

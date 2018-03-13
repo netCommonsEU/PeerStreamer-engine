@@ -73,7 +73,7 @@ int8_t endpoint_cmp(const void * e1, const void *e2)
 	return 0;
 }
 
-packet_state_t endpoint_add_incoming_fragment(struct endpoint * e, const struct fragment *f, struct list_head ** requests)
+packet_state_t endpoint_add_incoming_fragment(struct endpoint * e, const struct fragment *f, struct list_head * requests)
 {
 	return packet_bucket_add_fragment(e->incoming, f, requests);
 }

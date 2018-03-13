@@ -432,7 +432,20 @@ struct nodeID *nodeid_undump(const uint8_t *b, int *len)
 
 void net_helper_deinit(struct nodeID *s)
 {
-	s->occurrences = 1;
+	if (s->fd >= 0)
+	{
+		close(s->fd);
+		s->fd = -1;
+	}
+	if (s->nm)
+		network_manager_destroy(&(s->nm));
+	if (s->shaper)
+		network_shaper_destroy(&(s->shaper));
+	if (s->sending_buffer)
+	{
+		free(s->sending_buffer);
+		s->sending_buffer = NULL;
+	}
 	nodeid_free(s);
 }
 
@@ -442,23 +455,7 @@ void nodeid_free(struct nodeID *s)
 	{
 		s->occurrences--;
 		if (s->occurrences == 0)
-		{
-			if (s->fd >= 0)
-			{
-				close(s->fd);
-				s->fd = -1;
-			}
-			if (s->nm)
-				network_manager_destroy(&(s->nm));
-			if (s->shaper)
-				network_shaper_destroy(&(s->shaper));
-			if (s->sending_buffer)
-			{
-				free(s->sending_buffer);
-				s->sending_buffer = NULL;
-			}
 			free(s);
-		}
 	}
 }
 

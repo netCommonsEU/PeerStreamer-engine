@@ -27,7 +27,7 @@
 
 
 struct packet_bucket {
-	struct list_head * packet_list;
+	struct list_head packet_list;
 	struct ord_set * packet_set;
 	size_t frag_size; 
 	uint16_t max_pkt_age;
@@ -35,10 +35,7 @@ struct packet_bucket {
 
 void packet_bucket_destroy_packet(struct packet_bucket *pb, struct fragmented_packet * fp)
 {
-	if (list_empty(pb->packet_list))
-		pb->packet_list = NULL;
-	else
-		list_del(&(fp->list));
+	list_del(&(fp->list));
 	ord_set_remove(pb->packet_set, fp, 0);
 	fragmented_packet_destroy(&fp);
 }
@@ -51,16 +48,17 @@ void packet_bucket_periodic_refresh(struct packet_bucket * pb)
 	struct fragmented_packet * fp;
 
 	current_time = time(NULL);
-	pos = pb->packet_list;
-	while (pos && pos != pb->packet_list && time_check)
+	pos = pb->packet_list.next;
+	tmp = pos->next;
+	while (pos != &(pb->packet_list) && time_check)
 	{
-		tmp = pos->next;
 		fp = list_entry(pos, struct fragmented_packet, list);
 		if (current_time - fragmented_packet_creation_timestamp(fp) >= pb->max_pkt_age)
 			packet_bucket_destroy_packet(pb, fp);
 		else
 			time_check = 0;
 		pos = tmp;
+		tmp = pos->next;
 	}
 }
 
@@ -72,19 +70,18 @@ struct list_head * packet_bucket_add_packet(struct packet_bucket * pb, const str
 
 	if (pb && src && dst && data && data_len > 0)
 	{
+		res = malloc(sizeof(struct list_head));
+		INIT_LIST_HEAD(res);
 		packet_bucket_periodic_refresh(pb);
-		fp = fragmented_packet_create(pid, src, dst, data, data_len, pb->frag_size, &res);
+		fp = fragmented_packet_create(pid, src, dst, data, data_len, pb->frag_size, res);
 		insert_res = ord_set_insert(pb->packet_set, fp, 0);
 		if (fp == insert_res)
+			list_add_tail(&(fp->list), &(pb->packet_list));
+		else 
 		{
-			if (pb->packet_list)
-				list_add_tail(&(fp->list), pb->packet_list);
-			else {
-				pb->packet_list = &(fp->list);
-				INIT_LIST_HEAD(pb->packet_list);
-			}
-		} else 
+			free(res);
 			fragmented_packet_destroy(&fp);
+		}
 	}
 
 	return res;
@@ -108,7 +105,7 @@ struct packet_bucket * packet_bucket_create(size_t frag_size, uint16_t max_pkt_a
 
 	pb = malloc(sizeof(struct packet_bucket));
 	pb->packet_set = ord_set_new(10, packet_cmp);
-	pb->packet_list = NULL;
+	INIT_LIST_HEAD(&(pb->packet_list));
 	pb->frag_size = frag_size;
 	pb->max_pkt_age = max_pkt_age;
 	return pb;
@@ -130,7 +127,7 @@ void packet_bucket_destroy(struct packet_bucket ** pb)
 	}
 }
 
-packet_state_t packet_bucket_add_fragment(struct packet_bucket *pb, const struct fragment *f, struct list_head ** requests)
+packet_state_t packet_bucket_add_fragment(struct packet_bucket *pb, const struct fragment *f, struct list_head * requests)
 {
 	packet_state_t res = PKT_ERROR;
 	struct fragmented_packet dummy;
@@ -149,12 +146,7 @@ packet_state_t packet_bucket_add_fragment(struct packet_bucket *pb, const struct
 		{
 			fp = fragmented_packet_empty(f->pid, src, dst, f->frag_num);
 			ord_set_insert(pb->packet_set, fp, 0);
-			if (pb->packet_list)
-				list_add_tail(&(fp->list), pb->packet_list);
-			else {
-				pb->packet_list = &(fp->list);
-				INIT_LIST_HEAD(pb->packet_list);
-			}
+			list_add_tail(&(fp->list), &(pb->packet_list));
 		}
 		res = fragmented_packet_write_fragment(fp, f, requests);
 	}
