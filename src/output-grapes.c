@@ -171,7 +171,8 @@ int output_deliver(struct chunk_output* outg, const struct chunk *c)
 
 
 				// we place the packet
-				chunk_clone(&(outg->buff[new_pos]), c);
+				if (c->id != (outg->buff[new_pos]).id)  // we do not want duplicates
+					chunk_clone(&(outg->buff[new_pos]), c);
 
 				// we flush everygthing possible
 				while(outg->buff[outg->head].id >= 0)

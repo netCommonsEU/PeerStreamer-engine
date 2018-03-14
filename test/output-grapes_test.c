@@ -222,13 +222,115 @@ void output_noreordering_test()
 	fprintf(stderr,"%s successfully passed!\n",__func__);
 }
 
+void output_reordering_flawless_test()
+{
+	struct chunk * c;
+	struct chunk_output * outg;
+	int res;
+
+	outg = output_create(NULL, "dechunkiser=dummy,outbuff_length=3");
+
+	c = create_chunk(1);
+	res = output_deliver(outg, c);
+	assert(res == 1);
+	destroy_chunk(&c);
+
+	c = create_chunk(2);
+	res = output_deliver(outg, c);
+	assert(res == 1);
+	destroy_chunk(&c);
+
+	c = create_chunk(3);
+	res = output_deliver(outg, c);
+	assert(res == 1);
+	destroy_chunk(&c);
+
+	c = create_chunk(4);
+	res = output_deliver(outg, c);
+	assert(res == 1);
+	destroy_chunk(&c);
+
+	c = create_chunk(5);
+	res = output_deliver(outg, c);
+	assert(res == 1);
+	destroy_chunk(&c);
+
+	c = create_chunk(6);
+	res = output_deliver(outg, c);
+	assert(res == 1);
+	destroy_chunk(&c);
+
+	output_destroy(&outg);
+
+	fprintf(stderr,"%s successfully passed!\n",__func__);
+}
+
+void output_ordering_duplicates_test()
+{
+	struct chunk * c;
+	struct chunk_output * outg;
+	int res;
+
+	outg = output_create(NULL, "dechunkiser=dummy,outbuff_length=3");
+
+	c = create_chunk(4);
+	res = output_deliver(outg, c);
+	assert(res == 1);
+	destroy_chunk(&c);
+
+	c = create_chunk(6);
+	res = output_deliver(outg, c);
+	assert(res == 0);
+	destroy_chunk(&c);
+
+	c = create_chunk(6);
+	res = output_deliver(outg, c);
+	assert(res == 0);
+	destroy_chunk(&c);
+
+	output_destroy(&outg);
+
+	fprintf(stderr,"%s successfully passed!\n",__func__);
+}
+
+void output_destroy_test()
+{
+	struct chunk * c;
+	struct chunk_output * outg;
+	int res;
+
+	outg = output_create(NULL, "dechunkiser=dummy,outbuff_length=10");
+
+	c = create_chunk(5);
+	res = output_deliver(outg, c);
+	assert(res == 1);
+	destroy_chunk(&c);
+
+	c = create_chunk(9);
+	res = output_deliver(outg, c);
+	assert(res == 0);
+	destroy_chunk(&c);
+
+	c = create_chunk(8);
+	res = output_deliver(outg, c);
+	assert(res == 0);
+	destroy_chunk(&c);
+
+	output_destroy(&outg);
+
+	fprintf(stderr,"%s successfully passed!\n",__func__);
+}
+
 int main()
 {
 	output_create_test();
 	output_deliver_test();
 	output_reordering_test();
 	output_reordering2_test();
+	output_reordering_flawless_test();
+	output_ordering_duplicates_test();
 	output_noreordering_test();
+	output_destroy_test();
 	return 0;
 }
 

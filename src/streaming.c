@@ -983,16 +983,19 @@ suseconds_t streaming_offer_interval(const struct streaming_context *stc)
 	const struct peer * p;
 	int i;
 	double load = 0;
+	double ms_int = 0;
 	suseconds_t offer_int;
 
 	offer_int = chunk_interval_measure(psinstance_measures(stc->ps));
+	ms_int = offer_int;
+	ms_int *= 0.75;  // we try to relax it a bit 
 	
 	if (stc->dist_type == DIST_TURBO) {
 		pset = topology_get_neighbours(psinstance_topology(stc->ps));
 		peerset_for_each(pset,p,i)
 			load += peerWeightInvNeigh((struct peer **)&p);
-		offer_int /= load;
-	}
+		ms_int /= load;
+	} 
 
-	return offer_int / stc->offer_per_period;
+	return (suseconds_t)(ms_int / stc->offer_per_period);
 }

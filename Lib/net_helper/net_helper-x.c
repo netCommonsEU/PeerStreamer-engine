@@ -354,9 +354,7 @@ struct nodeID *nodeid_dup(const struct nodeID *s)
 
 	n = (struct nodeID *) s;
 	if (n)
-	{
 		n->occurrences++;
-	}
   return n;
 }
 
