@@ -32,7 +32,7 @@
 #include "dbg.h"
 
 #define INITIAL_ID 0
-#define DEFAULT_DATA_INTERVAL 40000
+#define DEFAULT_DATA_INTERVAL 3000
 
 struct input_desc {
   struct input_stream *s;

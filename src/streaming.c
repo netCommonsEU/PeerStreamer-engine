@@ -110,6 +110,8 @@ struct streaming_context * streaming_create(const struct psinstance * ps, struct
 	free(tags);
 
 	stc->input = inc ? input_open(inc->filename, inc->fds, inc->fds_size, config) : NULL;
+	if (inc)
+		inc->fds[inc->fds_size] = -1;
 	stc->cb_size = psinstance_chunkbuffer_size(ps);
 	sprintf(conf, "size=%d", stc->cb_size);
 	stc->cb = cb_init(conf);
