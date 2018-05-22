@@ -26,7 +26,7 @@
 #include<sys/time.h>
 
 #define DEFAULT_BYTERATE 1000000
-#define DEFAULT_BYTERATE_MULTIPLYER 2
+#define DEFAULT_BYTERATE_MULTIPLYER 8
 
 struct network_shaper;
 

@@ -26,7 +26,7 @@
 
 struct chunk_locks;
 
-struct chunk_locks * chunk_locks_create(uint8_t lock_timeout);
+struct chunk_locks * chunk_locks_create(uint32_t lock_timeout_ms);
 void chunk_locks_destroy(struct chunk_locks ** cl);
 void chunk_lock(struct chunk_locks * cl, int chunkid, struct peer *from);
 void chunk_unlock(struct chunk_locks * cl, int chunkid);

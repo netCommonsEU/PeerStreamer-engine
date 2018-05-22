@@ -77,13 +77,13 @@ void locks_init(struct chunk_locks * cl)
   }
 }
 
-struct chunk_locks * chunk_locks_create(uint8_t lock_timeout)
+struct chunk_locks * chunk_locks_create(uint32_t lock_timeout_ms)
 {
 	struct chunk_locks * cl;
 	cl = malloc(sizeof(struct chunk_locks));
 	cl->locks = NULL;
-	cl->toutdiff.tv_sec = lock_timeout;
-	cl->toutdiff.tv_usec = 0;
+	cl->toutdiff.tv_sec = lock_timeout_ms/1000;
+	cl->toutdiff.tv_usec = (lock_timeout_ms%1000)*1000;
 
 	locks_init(cl);
 	return cl;

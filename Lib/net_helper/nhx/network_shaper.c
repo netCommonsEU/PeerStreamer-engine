@@ -39,7 +39,7 @@ struct network_shaper * network_shaper_create(const char * config)
 	ns = malloc(sizeof(struct network_shaper));
 	gettimeofday(&(ns->next_sending_event), NULL);
 	ns->multiplyer = DEFAULT_BYTERATE_MULTIPLYER;
-	ns->alpha_memory = 0.1;
+	ns->alpha_memory = 0.9;
 	ns->estimated_byterate_persecond = DEFAULT_BYTERATE;
 	gettimeofday(&(ns->last_update_time), NULL);
 	gettimeofday(&(ns->next_sending_event), NULL);

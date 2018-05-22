@@ -115,7 +115,7 @@ struct streaming_context * streaming_create(const struct psinstance * ps, struct
 	stc->cb_size = psinstance_chunkbuffer_size(ps);
 	sprintf(conf, "size=%d", stc->cb_size);
 	stc->cb = cb_init(conf);
-	stc->ch_locks = chunk_locks_create(2);
+	stc->ch_locks = chunk_locks_create(40);  // milliseconds of lock time
 
 	chunkDeliveryInit(psinstance_nodeid(ps));
 	chunkSignalingInit(psinstance_nodeid(ps));

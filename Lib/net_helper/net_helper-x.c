@@ -77,7 +77,7 @@ void net_helper_send_attempt(struct nodeID *s, struct timeval *interval)
 		}
 	} else {  // in case we have an empty outqueue we have to poll it periodically...
 		interval->tv_sec = 0;
-		interval->tv_usec = 5000;
+		interval->tv_usec = 1000;
 	}
 }
 
