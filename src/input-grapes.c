@@ -30,6 +30,7 @@
 
 #include "input.h"
 #include "dbg.h"
+#include<chunk_attributes.h>
 
 #define INITIAL_ID 0
 #define DEFAULT_DATA_INTERVAL 3000
@@ -141,4 +142,29 @@ int input_get(struct input_desc *s, struct chunk *c)
   c->timestamp = now.tv_sec * 1000000ULL + now.tv_usec;
 
   return delta;
+}
+
+struct chunk *input_chunk(struct input_desc * s, suseconds_t *delta)
+{
+  struct chunk *c;
+
+  c = malloc(sizeof(struct chunk));
+  if (!c) {
+    fprintf(stderr, "Memory allocation error!\n");
+    return NULL;
+  }
+  memset(c, 0, sizeof(struct chunk));
+
+  *delta = (suseconds_t)input_get(s, c);
+  if (*delta < 0) {
+    fprintf(stderr, "Error in input!\n");
+    exit(-1);
+  }
+  if (c->data == NULL) {
+    free(c);
+    return NULL;
+  }
+  dprintf("Generated chunk %d of %d bytes\n",c->id, c->size);
+  chunk_attributes_init(c);
+  return c;
 }

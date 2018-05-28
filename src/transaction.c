@@ -91,9 +91,6 @@ void check_neighbor_status_list(struct service_times_element ** stl) {
 		if ( (current_time.tv_sec + current_time.tv_usec*1e-6 - stl_iterator->st.offer_sent_time) > TRANS_ID_MAX_LIFETIME) {
 			 dprintf("LIST TIMEOUT: trans_id %d, offer_sent_time %f, accept_received_time %f\n", stl_iterator->st.trans_id, (double) ((current_time.tv_sec + current_time.tv_usec*1e-6) - stl_iterator->st.offer_sent_time  ), (double) ((current_time.tv_sec + current_time.tv_usec*1e-6) - stl_iterator->st.accept_received_time));
 			 //fprintf(stderr, "LIST TIMEOUT: trans_id %d, offer_sent_time %f, accept_received_time %f\n", stl_iterator->st.trans_id, (double) ((current_time.tv_sec + current_time.tv_usec*1e-6) - stl_iterator->st.offer_sent_time  ), (double) ((current_time.tv_sec + current_time.tv_usec*1e-6) - stl_iterator->st.accept_received_time));
-#ifndef MONL
-			timeout_reception_measure(stl_iterator->st.id);
-#endif
 		_transaction_remove(stl, stl_iterator);
 
 			// Free the memory
@@ -164,10 +161,6 @@ bool transaction_reg_accept(struct service_times_element * stl, uint16_t trans_i
 		while (stl_iterator != NULL) {
 				if (stl_iterator->st.trans_id == trans_id) {
 					stl_iterator->st.accept_received_time = current_time.tv_sec + current_time.tv_usec*1e-6;
-	#ifndef MONL
-					offer_accept_rtt_measure(id,stl_iterator->st.accept_received_time - stl_iterator->st.offer_sent_time);
-					reception_measure(id);
-	#endif
 					return true;
 					}
 				stl_iterator = stl_iterator->forward;
@@ -199,11 +192,6 @@ double transaction_remove(struct service_times_element ** stl, uint16_t trans_id
 		return -2.0;
 	}
 	
-#ifndef MONL
-	// This function is called when an ACK is received, so:
-	reception_measure(stl_iterator->st.id);
-#endif
-
 	to_return = stl_iterator->st.accept_received_time;
 
 	_transaction_remove(stl, stl_iterator);

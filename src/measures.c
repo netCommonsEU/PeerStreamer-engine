@@ -59,78 +59,29 @@ void measures_destroy(struct measures ** m)
 	}
 }
 
-int8_t measures_add_node(struct measures * m, struct nodeID * id)
-{
-	return 0;
-}
-
-int8_t reg_chunk_playout(struct measures * m, int id, bool b, uint64_t timestamp)
-{
-	return 0;
-}
-
-int8_t reg_chunk_duplicate(struct measures * m)
-{
-	return 0;
-}
-
-int8_t reg_neigh_size(struct measures * m, size_t t)
-{
-	return 0;
-}
-
-int8_t reg_offer_accept_in(struct measures * m, uint8_t t)
+int8_t reg_chunk_receive(struct measures * m, struct chunk *c) 
 { 
-	return 0;
-}
-
-int8_t reg_chunk_receive(struct measures * m, int cid, uint64_t ctimestamp, int hopcount, int8_t old, int8_t duplicate)
-{ 
-	if (!duplicate)  // chunk interval estimation
+	if (m && c)  // chunk interval estimation
 	{
 		switch (m->cie.state) {
 			case deinit:
-				m->cie.first_index = cid;
-				m->cie.last_index = cid;
-				m->cie.first_timestamp = ctimestamp;
+				m->cie.first_index = c->id;
+				m->cie.last_index = c->id;
+				m->cie.first_timestamp = c->timestamp;
 				m->cie.state = loading;
 				break;
 			case loading:
+				break;
 			case ready:
-				if (cid > (int64_t)m->cie.last_index)
+				if (c->id > (int64_t)m->cie.last_index)
 				{
-					m->cie.chunk_interval = ((ctimestamp - m->cie.first_timestamp))/(cid - m->cie.first_index);
-					m->cie.last_index = cid;
+					m->cie.chunk_interval = ((c->timestamp - m->cie.first_timestamp))/(c->id - m->cie.first_index);
+					m->cie.last_index = c->id;
 				}
 				m->cie.state = ready;
 				break;
 		}
 	}
-	return 0;
-}
-
-int8_t reg_offer_accept_out(struct measures * m, uint8_t t)
-{ 
-	return 0;
-}
-
-int8_t reg_chunk_send(struct measures * m, int id)
-{ 
-	return 0;
-}
-
-int8_t timeout_reception_measure(const struct nodeID * id)
-{ 
-	return 0;
-}
-
-int8_t offer_accept_rtt_measure(const struct nodeID * id, uint64_t rtt)
-{ 
-	return 0;
-}
-
-int8_t reception_measure(const struct nodeID * id)
-{ 
 	return 0;
 }
 
