@@ -69,7 +69,7 @@ void streaming_timers_set_timeout(struct streaming_timers * psl, suseconds_t int
 	}
 }
 
-enum streaming_action streaming_timers_state_handler(struct streaming_timers * psl, int data_state, int8_t source_role)
+enum streaming_action streaming_timers_state_handler(struct streaming_timers * psl, int data_state)
 {
 	enum streaming_action action = NO_ACTION;
 	struct timeval current_epoch;
@@ -80,7 +80,7 @@ enum streaming_action streaming_timers_state_handler(struct streaming_timers * p
 			break;
 		case 0: // timeout, no socket has data to pick
 			gettimeofday(&current_epoch, NULL);
-			if (source_role && timercmp(&(psl->chunk_epoch), &current_epoch, <)) // chunk seeding time! 
+			if (timercmp(&(psl->chunk_epoch), &current_epoch, <)) // chunk seeding time! 
 				action = INJECT_ACTION;
 			else 
 				if (timercmp(&(psl->offer_epoch), &current_epoch, <)) // offer time

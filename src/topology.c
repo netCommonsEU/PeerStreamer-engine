@@ -87,7 +87,7 @@ void peerset_print(const struct peerset * pset, const char * name)
 void update_metadata(struct topology * t)
 {
 	metadata_update(&(t->my_metadata), 
-			psinstance_is_source(t->ps) ? 0 : chunk_trader_buffer_size(psinstance_trader(t->ps)),
+			chunk_trader_buffer_size(psinstance_trader(t->ps)),
 			peerset_size(t->neighbourhood));
 	psample_change_metadata(t->tc, &(t->my_metadata), sizeof(struct metadata));
 }

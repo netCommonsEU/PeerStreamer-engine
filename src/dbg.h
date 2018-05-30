@@ -21,14 +21,15 @@
 #ifndef DBG_H
 #define DBG_H
 
-#include <stdio.h>
-#include <stdint.h>
+#include<stdio.h>
+#include<stdint.h>
 
-#include <chunk.h>
-#include <net_helper.h>
-#include <topology.h>
-#include <psinstance.h>
-#include <trade_sig_ha.h>
+#include<chunk.h>
+#include<net_helper.h>
+#include<topology.h>
+#include<psinstance.h>
+#include<chunkidms.h>
+#include<chunkidms_trade.h>
 
 int ftprintf(FILE *stream, const char *format, ...);
 
@@ -40,12 +41,14 @@ int ftprintf(FILE *stream, const char *format, ...);
 #define dtprintf(...)
 #endif
 
-void log_signal(const struct nodeID *fromid,const struct nodeID *toid,const int cidset_size,uint16_t trans_id,enum signaling_type type,const char *flag);
+
+void log_signal(const struct nodeID *fromid,const struct nodeID *toid,uint16_t trans_id, enum signaling_typeMS type,const char *flag, const struct chunkID_multiSet *ms);
 
 void log_chunk(const struct nodeID *from,const struct nodeID *to,const struct chunk *c,const char * note);
 
 void log_neighbourhood(const struct psinstance * ps);
 
 void log_chunk_error(const struct nodeID *from,const struct nodeID *to,const struct chunk *c,int error);
+
 
 #endif	/* DBG_H */

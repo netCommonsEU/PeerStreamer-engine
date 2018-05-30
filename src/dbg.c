@@ -1,6 +1,7 @@
 /*
  * Copyright (c) 2010-2011 Luca Abeni
  * Copyright (c) 2010-2011 Csaba Kiraly
+ * Copyright (c) 2018 Massimo Girondi
  *
  * This file is part of PeerStreamer.
  *
@@ -18,18 +19,19 @@
  * along with PeerStreamer.  If not, see <http://www.gnu.org/licenses/>.
  *
  */
-#include <sys/time.h>
-#include <stdio.h>
-#include <stdarg.h>
-#include <time.h>
-#include <inttypes.h>
+#include<sys/time.h>
+#include<stdio.h>
+#include<stdarg.h>
+#include<time.h>
+#include<inttypes.h>
 
 #include<dbg.h>
 #include<chunk_trader.h>
 #include<net_helpers.h>
-#include <peerset.h>
-#include <chunkbuffer.h>
-
+#include<peerset.h>
+#include<chunkbuffer.h>
+#include<chunkidms.h>
+#include<chunkidms_trade.h>
 
 int ftprintf(FILE *stream, const char *format, ...)
 {
@@ -55,7 +57,7 @@ uint64_t gettimeofday_in_us(void)
 	return what_time.tv_sec * 1000000ULL + what_time.tv_usec;
 }
 
-void log_signal(const struct nodeID *fromid,const struct nodeID *toid,const int cidset_size,uint16_t trans_id,enum signaling_type type,const char *flag)
+void log_signal(const struct nodeID *fromid,const struct nodeID *toid,uint16_t trans_id, enum signaling_typeMS type,const char *flag, const struct chunkID_multiSet *ms)
 {
 	char typestr[24];
 	char sndr[NODE_STR_LENGTH],rcvr[NODE_STR_LENGTH];
@@ -90,6 +92,13 @@ void log_signal(const struct nodeID *fromid,const struct nodeID *toid,const int 
 
 	}
 	fprintf(stderr,"[SIGNAL_LOG],%"PRIu64",%s,%s,%d,%s,%s\n",gettimeofday_in_us(),sndr,rcvr,trans_id,typestr,flag);
+        if(ms)
+        {
+                fprintf(stderr,"\t---->%d sets, %d chunks\n",chunkID_multiSet_size(ms), chunkID_multiSet_total_size(ms));
+#ifdef LOG_CHUNK
+                chunkID_multiSet_print(stderr, ms);
+#endif
+        }
 }
 
 void log_chunk(const struct nodeID *from,const struct nodeID *to,const struct chunk *c,const char * note)
@@ -102,7 +111,7 @@ void log_chunk(const struct nodeID *from,const struct nodeID *to,const struct ch
 		node_addr(to,rcvr,NODE_STR_LENGTH);
 
 	if (c)
-		fprintf(stderr,"[CHUNK_LOG],%"PRIu64",%s,%s,%d,%d,%"PRIu64",%i,%s\n",gettimeofday_in_us(),sndr,rcvr,c->id,c->size,c->timestamp,chunk_attributes_get_hopcount(c),note);
+		fprintf(stderr,"[CHUNK_LOG],%"PRIu64",%s,%s,%d[%d],%d,%"PRIu64",%i,%s\n",gettimeofday_in_us(),sndr,rcvr,c->id,c->flow_id,c->size,c->timestamp,chunk_attributes_get_hopcount(c),note);
 	else
 		fprintf(stderr,"[CHUNK_LOG],%"PRIu64",%s,%s,%d,%d,%d,%i,%s\n",gettimeofday_in_us(),sndr,rcvr,-1,-1,0,0,note);
 }
@@ -143,3 +152,5 @@ void log_chunk_error(const struct nodeID *from,const struct nodeID *to,const str
 			log_chunk(from,to,c,"ERROR");
 	} 
 }
+
+

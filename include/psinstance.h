@@ -31,7 +31,7 @@ typedef long suseconds_t;
 struct psinstance;
 
 /********************High-level Interface***********************/
-struct psinstance * psinstance_create(const char * srv_ip, const int srv_port, const char * config);
+struct psinstance * psinstance_create(const char * config);
 
 void psinstance_destroy(struct psinstance ** ps);
 

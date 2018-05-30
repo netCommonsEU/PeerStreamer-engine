@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2017 Luca Baldesi
+ * Copyright (c) 2018 Massimo Girondi
  *
  * This file is part of PeerStreamer.
  *
@@ -50,9 +51,13 @@ struct psinstance {
 	suseconds_t chunk_offer_interval; // microseconds
 	int source_multiplicity;
 	enum L3PROTOCOL l3;
+
+        int bs_port;
+        char *bs_addr;
+
 };
 
-int config_parse(struct psinstance * ps,const char * config)
+int config_parse(struct psinstance * ps, const char * config)
 {
 	struct tag * tags;
 	const char *tmp_str;
@@ -64,6 +69,11 @@ int config_parse(struct psinstance * ps,const char * config)
 	grapes_config_value_int_default(tags, "port", &(ps->port), 0);
 	grapes_config_value_int_default(tags, "source_multiplicity", &(ps->source_multiplicity), 3);
 
+
+        tmp_str = grapes_config_value_str_default(tags, "bs_addr", NULL);
+        ps->bs_addr = tmp_str ? strdup(tmp_str) : NULL;
+        grapes_config_value_int_default(tags, "bs_port", &(ps->bs_port), 6000);
+        
 	tmp_str = grapes_config_value_str_default(tags, "filename", NULL);
 	strcpy((ps->inc).filename, tmp_str ? tmp_str : "");
 	tmp_str = grapes_config_value_str_default(tags, "AF", NULL);
@@ -95,48 +105,58 @@ int node_init(struct psinstance * ps, const char * config)
 		return -2;
 }
 
-struct psinstance * psinstance_create(const char * srv_ip, const int srv_port, const char * config)
+struct psinstance * psinstance_create(const char * config)
 {
 	struct psinstance * ps = NULL;
 	struct nodeID * srv;
 	int res;
 
-	if (srv_ip && srv_port >= 0 && srv_port < 65536)
-	{
-		ps = malloc(sizeof(struct psinstance));
-		memset(ps, 0, sizeof(struct psinstance));
+	ps = malloc(sizeof(struct psinstance));
+        memset(ps, 0, sizeof(struct psinstance));
+        
+        ps->chunk_time_interval = 0;
+        ps->chunk_offer_interval = 1000000/25;  // microseconds divided by frame (chunks) per second
+        config_parse(ps, config);
+        res = node_init(ps, config);
+        if (ps->port >= 0 && ps->port < 65536 && res == 0)
+        {
+                ps->trader = chunk_trader_create(ps, config);
+       
+                ps->measure = measures_create(nodeid_static_str(ps->my_sock));
+                ps->topology = topology_create(ps, config);
+                ps->trader = chunk_trader_create(ps, config);
+                streaming_timers_init(&(ps->timers), ps->chunk_offer_interval);
+                ps->chunk_out = output_create(ps->measure, config);
+                
+                if(ps->bs_addr)
+                {
+                         //Normal peer (not the first)
+                         fprintf(stderr,"Trying to contact the bootstrap node.\n");
+                         srv = create_node(ps->bs_addr, ps->bs_port);
+                       	 if (srv)
+			 {	//the connection to the bootstrap node is successfull
+				topology_node_insert(ps->topology, srv);
+				nodeid_free(srv);
+			 }else	//error to get the address of the peer
+		         {
+                                fprintf(stderr, "Error while connecting to bootstrap mode, exiting.\n");
+                                psinstance_destroy(&ps);
+                         }
+                }
+                else
+                {
+                        // creating the first peer (aka root peer, bootstrap node)
+  		        fprintf(stderr,"Running as bootstrap node.\n");
+                }
 
-		ps->chunk_time_interval = 0;
-		ps->chunk_offer_interval = 1000000/25;  // microseconds divided by frame (chunks) per second
-		config_parse(ps, config);
-		res = node_init(ps, config);
-		if (res == 0)
-		{
-			ps->measure = measures_create(nodeid_static_str(ps->my_sock));
-			ps->topology = topology_create(ps, config);
-			ps->trader = chunk_trader_create(ps, config);
-			streaming_timers_init(&(ps->timers), ps->chunk_offer_interval);
-			ps->chunk_out = NULL;  // To be used as a flag if current role is source or peer role
-			if (srv_port)
-			{  // creating a normal peer
-				srv = create_node(srv_ip, srv_port);
-				if (srv)
-				{
-					ps->inc.fds[0] = -1;
-					ps->input = NULL;
-					topology_node_insert(ps->topology, srv);
-					ps->chunk_out = output_create(ps->measure, config);
-					nodeid_free(srv);
-				} else
-					psinstance_destroy(&ps);
-			} else {  // creating a source peer
-				ps->input = input_open((ps->inc).filename, (ps->inc).fds, (ps->inc).fds_size, config);
-				(ps->inc).fds[(ps->inc).fds_size] = -1;
-			}
-		}
-		else
-			psinstance_destroy(&ps);
-	}
+                
+                ps->input = input_open((ps->inc).filename, 
+                                        (ps->inc).fds, (ps->inc).fds_size, config);
+        }
+        else
+        {
+                psinstance_destroy(&ps);
+        }
 
 	return ps;
 }
@@ -159,7 +179,9 @@ void psinstance_destroy(struct psinstance ** ps)
 			net_helper_deinit((*ps)->my_sock);
 		if ((*ps)->input)
 			input_close((*ps)->input);
-		free(*ps);
+                if ((*ps)->bs_addr)
+                        free((*ps)->bs_addr);
+                free(*ps);
 		*ps = NULL;
 	}
 }
@@ -169,10 +191,6 @@ struct nodeID * psinstance_nodeid(const struct psinstance * ps)
 	return ps->my_sock;
 }
 
-int8_t psinstance_is_source(const struct psinstance * ps)
-{
-	return ps->chunk_out ? 0 : 1;
-}
 
 struct topology * psinstance_topology(const struct psinstance * ps)
 {
@@ -205,7 +223,7 @@ int8_t psinstance_inject_chunk(struct psinstance * ps)
 	struct chunk * new_chunk;
 	int8_t res = 0;
 
-	if (ps && psinstance_is_source(ps))
+	if (ps)
 	{
 		new_chunk = input_chunk(ps->input, &(ps->chunk_time_interval));
 		if(new_chunk) 
@@ -250,22 +268,18 @@ int8_t psinstance_handle_msg(struct psinstance * ps)
 				break;
 			case MSG_TYPE_CHUNK:
 				dtprintf("Chunk message received:\n");
-				if(psinstance_is_source(ps))
-					dtprintf("\tDiscarded as playing source role\n");
-				else
-				{
-					c = chunk_trader_parse_chunk(ps->trader, remote, buff, len);
-					if (c)
-					{
-						if (!chunk_trader_add_chunk(ps->trader, c))
-						{
-							reg_chunk_receive(ps->measure, c);
-							output_deliver(ps->chunk_out, c);
-							free(c);
-						} else
-							chunk_destroy(&c);
-					}
-				}
+				c = chunk_trader_parse_chunk(ps->trader, remote,
+                                                             buff, len);
+                                if (c)
+                                {
+                                        if (!chunk_trader_add_chunk(ps->trader, c))
+                                        {
+                                                reg_chunk_receive(ps->measure, c);
+                                                output_deliver(ps->chunk_out, c);
+                                                free(c);
+                                        } else
+                                                chunk_destroy(&c);
+                                }
 				res = 2;
 				break;
 			case MSG_TYPE_SIGNALLING:
@@ -290,12 +304,13 @@ int psinstance_poll(struct psinstance *ps, suseconds_t delta)
 
 	if (ps)
 	{
-		streaming_timers_set_timeout(&ps->timers, delta, psinstance_is_source(ps) && ps->inc.fds[0] == -1);
+		streaming_timers_set_timeout(&ps->timers, delta, ps->inc.fds[0] == -1);
 		dtprintf("[DEBUG] timer: %lu %lu\n", ps->timers.sleep_timer.tv_sec, ps->timers.sleep_timer.tv_usec); 
 		data_state = wait4data(ps->my_sock, &(ps->timers.sleep_timer), ps->inc.fds);
 
-		required_action = streaming_timers_state_handler(&ps->timers, data_state, psinstance_is_source(ps));
-		switch (required_action) {
+		required_action = streaming_timers_state_handler(&ps->timers, data_state);
+		
+                switch (required_action) {
 			case OFFER_ACTION:
 				dtprintf("Offer time!\n");
 				psinstance_send_offer(ps);

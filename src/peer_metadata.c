@@ -67,7 +67,7 @@ void peer_data_init(struct peer *p)
 	{
 		p->metadata = NULL;
 		ud = malloc(sizeof(struct user_data));
-		ud->bmap = chunkID_set_init("type=bitmap");
+		ud->bmap = chunkID_multiSet_init(0,0);
 		timerclear(&ud->bmap_timestamp);
 		p->user_data = ud;
 	}
@@ -86,16 +86,16 @@ void peer_data_deinit(struct peer *p)
 	if (p && p->user_data)
 	{
 		ud = (struct user_data *)(p->user_data);
-		chunkID_set_free(ud->bmap);
+		chunkID_multiSet_free(ud->bmap);
 		free(ud);
 		p->user_data = NULL;
 	}
 }
 
-struct chunkID_set * peer_bmap(struct peer *p)
+struct chunkID_multiSet * peer_bmap(struct peer *p)
 {
 	struct user_data * ud;
-	struct chunkID_set * bmap = NULL;
+	struct chunkID_multiSet * bmap = NULL;
 	
 	if (p && p->user_data)
 	{

@@ -24,7 +24,7 @@
 #include<stdint.h>
 #include<time.h>
 #include<peer.h>
-#include<chunkidset.h>
+#include<chunkidms.h>
 
 #define DEFAULT_PEER_CBSIZE 50
 #define DEFAULT_PEER_NEIGH_SIZE 30
@@ -36,7 +36,7 @@ struct metadata {
 
 struct user_data {
 	struct timeval bmap_timestamp;
-	struct chunkID_set * bmap;
+	struct chunkID_multiSet * bmap;
 };
 
 int8_t metadata_update(struct metadata *m, uint16_t cb_size, uint8_t neigh_size);
@@ -51,7 +51,7 @@ void peer_data_init(struct peer *p);
 
 void peer_data_deinit(struct peer *p);
 
-struct chunkID_set * peer_bmap(struct peer *p);
+struct chunkID_multiSet * peer_bmap(struct peer *p);
 
 struct timeval * peer_bmap_timestamp(struct peer *p);
 

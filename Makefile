@@ -4,8 +4,8 @@ LIBNETHELPER=$(NET_HELPER)/libnethelper.a
 LIBGRAPES=$(GRAPES)/src/libgrapes.a
 LIBPS=src/libpstreamer.a
 LIBPS_SRC=$(wildcard src/*.c)
-LDFLAGS+=-l pstreamer -L src -l grapes -L $(GRAPES)/src -l nethelper -L$(NET_HELPER)
-
+LDFLAGS+=-l pstreamer -L src -l grapes -L $(GRAPES)/src -l nethelper -L$(NET_HELPER) -DMULTIFLOW
+CFLAGS+=-DMULTIFLOW
 pstreamer: pstreamer.c $(LIBPS) $(LIBGRAPES) $(LIBNETHELPER)
 	cc pstreamer.c -o pstreamer -I $(GRAPES)/include -I include/ $(LDFLAGS)
 
@@ -18,7 +18,7 @@ $(LIBPS): $(LIBPS_SRC)
 	NET_HELPER=$(NET_HELPER) GRAPES=$(GRAPES) $(MAKE) -C src/
 
 $(LIBGRAPES):
-	$(MAKE) -C $(GRAPES)
+	CFLAGS='-DMULTIFLOW' $(MAKE) -C $(GRAPES)
 
 $(LIBNETHELPER):
 	GRAPES=$(GRAPES) $(MAKE) -C $(NET_HELPER)

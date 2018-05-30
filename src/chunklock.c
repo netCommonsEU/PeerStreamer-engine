@@ -2,6 +2,7 @@
  * Copyright (c) 2010-2011 Csaba Kiraly
  * Copyright (c) 2010-2011 Luca Abeni
  * Copyright (c) 2017 Luca Baldesi
+ * Copyright (c) 2018 Massimo Girondi
  *
  * This file is part of PeerStreamer.
  *
@@ -34,6 +35,7 @@
 
 struct lock {
   int chunkid;
+  int flowid;
   struct nodeID *peer;
   struct timeval timestamp;
 };
@@ -115,10 +117,11 @@ void chunk_locks_cleanup(struct chunk_locks * cl){
   }
 }
 
-void chunk_lock(struct chunk_locks * cl, int chunkid, struct peer *from){
+void chunk_lock(struct chunk_locks * cl, int flowid, int chunkid, struct peer *from){
   if (cl && from)
   {
 	  cl->locks[cl->lcount].chunkid = chunkid;
+	  cl->locks[cl->lcount].flowid  = flowid;
 	  cl->locks[cl->lcount].peer = from ? nodeid_dup(from->id) : NULL;
 	  gettimeofday(&((cl->locks)[cl->lcount].timestamp), NULL);
 	  cl->lcount++;
@@ -130,13 +133,14 @@ void chunk_lock(struct chunk_locks * cl, int chunkid, struct peer *from){
   }
 }
 
-void chunk_unlock(struct chunk_locks * cl, int chunkid){
+void chunk_unlock(struct chunk_locks * cl, int flowid, int chunkid){
   size_t i;
 
   if (cl)
   {
 	  for (i=0; i<cl->lcount; i++) {
-		if ((cl->locks)[i].chunkid == chunkid) {
+		if ((cl->locks)[i].chunkid == chunkid &&
+                    (cl->locks)[i].flowid  == flowid) {
 		  chunk_lock_remove(cl, (cl->locks)+i);
 		  break;
 		}
@@ -144,7 +148,7 @@ void chunk_unlock(struct chunk_locks * cl, int chunkid){
   }
 }
 
-int chunk_islocked(struct chunk_locks * cl, int chunkid){
+int chunk_islocked(struct chunk_locks * cl, int flowid, int chunkid){
   size_t i;
 
   if(cl)
@@ -152,7 +156,8 @@ int chunk_islocked(struct chunk_locks * cl, int chunkid){
 	  chunk_locks_cleanup(cl);
 
 	  for (i=0; i<cl->lcount; i++) {
-		if ((cl->locks)[i].chunkid == chunkid) {
+		if ((cl->locks)[i].chunkid == chunkid &&
+                    (cl->locks)[i].flowid  == flowid) {
 		  return 1;
 		}
 	  }

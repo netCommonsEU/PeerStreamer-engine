@@ -28,8 +28,6 @@ struct psinstance;
 
 struct nodeID * psinstance_nodeid(const struct psinstance * ps);
 
-int8_t psinstance_is_source(const struct psinstance * ps);
-
 struct topology * psinstance_topology(const struct psinstance * ps);
 
 struct measures * psinstance_measures(const struct psinstance * ps);

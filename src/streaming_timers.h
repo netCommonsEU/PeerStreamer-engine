@@ -40,7 +40,7 @@ int streaming_timers_init(struct streaming_timers * psl, suseconds_t offer_inter
 
 void streaming_timers_set_timeout(struct streaming_timers * psl, suseconds_t interval, int8_t userfds);
 
-enum streaming_action streaming_timers_state_handler(struct streaming_timers * psl, int data_state, int8_t source_role);
+enum streaming_action streaming_timers_state_handler(struct streaming_timers * psl, int data_state);
 
 int8_t streaming_timers_update_flag(struct streaming_timers * psl);
 
