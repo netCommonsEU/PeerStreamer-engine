@@ -103,7 +103,7 @@ struct nodeID *create_node(const char *IPaddr, int port)
 	int error = 0;
 	struct addrinfo hints, *result = NULL;
 
-	if (IPaddr && port > 0)
+	if (IPaddr && port >= 0)
 	{
 		memset(&hints, 0, sizeof(hints));
 		hints.ai_family = AF_UNSPEC;
@@ -151,9 +151,12 @@ struct nodeID *create_node(const char *IPaddr, int port)
 struct nodeID *net_helper_init(const char *my_addr, int port, const char *config)
 {
 	int res;
-	struct nodeID *myself = NULL;;
+	struct nodeID *myself = NULL;
+	struct sockaddr_in bind_addr;
+	struct sockaddr_in6 bind_addr6;
+	socklen_t addr_len;
 
-	if (my_addr && port > 0)
+	if (my_addr && port >= 0)
 	{
 		myself = create_node(my_addr, port);
 		if (myself)
@@ -162,10 +165,20 @@ struct nodeID *net_helper_init(const char *my_addr, int port, const char *config
 			switch (myself->addr.ss_family)
 			{
 				case (AF_INET):
-					res = bind(myself->fd, (struct sockaddr *)&myself->addr, sizeof(struct sockaddr_in));
+					addr_len = sizeof(struct sockaddr_in);
+					memmove(&bind_addr, &(myself->addr), addr_len);
+					bind_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+					res = bind(myself->fd, (struct sockaddr *)&bind_addr, addr_len);
+					getsockname(myself->fd, (struct sockaddr *)&bind_addr, &addr_len);
+					((struct sockaddr_in*)&(myself->addr))->sin_port = bind_addr.sin_port;
 					break;
 				case (AF_INET6):
-					res = bind(myself->fd, (struct sockaddr *)&myself->addr, sizeof(struct sockaddr_in6));
+					addr_len = sizeof(struct sockaddr_in6);
+					memmove(&bind_addr6, &(myself->addr), addr_len);
+					bind_addr6.sin6_addr = in6addr_any;
+					res = bind(myself->fd, (struct sockaddr *)&bind_addr6, addr_len);
+					getsockname(myself->fd, (struct sockaddr *)&bind_addr6, &addr_len);
+					((struct sockaddr_in6*)&(myself->addr))->sin6_port = bind_addr6.sin6_port;
 					break;
 				default:
 					fprintf(stderr, "Cannot resolve address family %d in bind\n", myself->addr.ss_family);

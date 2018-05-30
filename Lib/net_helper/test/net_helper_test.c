@@ -13,7 +13,7 @@ void create_node_test()
 	assert(s == NULL);
 	s = create_node(NULL, 6000);
 	assert(s == NULL);
-	s = create_node("192.168.0.1", 0);
+	s = create_node("192.168.0.1", -1);
 	assert(s == NULL);
 
 	s = create_node("192.168.0.1", 6000);
@@ -29,11 +29,13 @@ void net_helper_init_test()
 
 	node = net_helper_init(NULL, 0, NULL);
 	assert(node == NULL);
-	node = net_helper_init("10.0.0.1", 0, NULL);
+	node = net_helper_init("127.0.0.1", -1, NULL);
 	assert(node == NULL);
 
-	node = net_helper_init("10.0.0.1", 6000, NULL);
-	assert(node == NULL);
+	node = net_helper_init("127.0.0.1", 0, NULL);
+	assert(node);
+	assert(node_port(node));
+	net_helper_deinit(node);
 
 	node = net_helper_init("127.0.0.1", 6000, NULL);
 	assert(node);

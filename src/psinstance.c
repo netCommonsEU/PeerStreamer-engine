@@ -64,7 +64,7 @@ int config_parse(struct psinstance * ps,const char * config)
 
 	tmp_str = grapes_config_value_str_default(tags, "iface", NULL);
 	ps->iface = tmp_str ? strdup(tmp_str) : NULL;
-	grapes_config_value_int_default(tags, "port", &(ps->port), 6000);
+	grapes_config_value_int_default(tags, "port", &(ps->port), 0);
 	grapes_config_value_int_default(tags, "chunkbuffer_size", &(ps->chunkbuffer_size), 50);
 	grapes_config_value_int_default(tags, "source_multiplicity", &(ps->source_multiplicity), 3);
 
