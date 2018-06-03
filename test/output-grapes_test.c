@@ -5,7 +5,7 @@
 #include<string.h>
 
 
-struct chunk * create_chunk(int id)
+struct chunk * create_chunk(int flowid, int id)
 {
 	struct chunk * c;
 	char msg[80];
@@ -14,6 +14,7 @@ struct chunk * create_chunk(int id)
 
 	c = malloc(sizeof(struct chunk));
 	c->id = id;
+        c->flow_id = flowid;
 	c->timestamp = 2;
 	c->attributes = NULL;
 	c->attributes_size = 0;
@@ -64,7 +65,7 @@ void output_deliver_test()
 	struct chunk * c;
 	struct chunk_output * outg;
 
-	c = create_chunk(1);
+	c = create_chunk(1,1);
 	outg = output_create(NULL, "dechunkiser=dummy");
 
 	output_deliver(NULL, NULL);
@@ -72,19 +73,19 @@ void output_deliver_test()
 	output_deliver(outg, c);
 	destroy_chunk(&c);
 
-	c = create_chunk(2);
+	c = create_chunk(1,2);
 	output_deliver(outg, c);
 	destroy_chunk(&c);
 
-	c = create_chunk(5);
+	c = create_chunk(1,5);
 	output_deliver(outg, c);
 	destroy_chunk(&c);
 
-	c = create_chunk(3);
+	c = create_chunk(1,3);
 	output_deliver(outg, c);
 	destroy_chunk(&c);
 
-	c = create_chunk(4);
+	c = create_chunk(1,4);
 	output_deliver(outg, c);
 	destroy_chunk(&c);
 
@@ -101,32 +102,33 @@ void output_reordering_test()
 
 	outg = output_create(NULL, "dechunkiser=dummy,outbuff_size=3");
 
-	c = create_chunk(4);
+	c = create_chunk(1,4);
 	res = output_deliver(outg, c);
-	assert(res == 1);
+        printf("%d\n",res);
+        assert(res == 1);
 	destroy_chunk(&c);
 
-	c = create_chunk(3);
-	res = output_deliver(outg, c);
-	assert(res == 0);
-	destroy_chunk(&c);
-
-	c = create_chunk(6);
+	c = create_chunk(1,3);
 	res = output_deliver(outg, c);
 	assert(res == 0);
 	destroy_chunk(&c);
 
-	c = create_chunk(5);
+	c = create_chunk(1,6);
+	res = output_deliver(outg, c);
+	assert(res == 0);
+	destroy_chunk(&c);
+
+	c = create_chunk(1,5);
 	res = output_deliver(outg, c);
 	assert(res == 2);
 	destroy_chunk(&c);
 
-	c = create_chunk(15);
+	c = create_chunk(1,15);
 	res = output_deliver(outg, c);
 	assert(res == 0);
 	destroy_chunk(&c);
 
-	c = create_chunk(18);
+	c = create_chunk(1,18);
 	res = output_deliver(outg, c);
 	assert(res == 1);
 	destroy_chunk(&c);
@@ -144,32 +146,32 @@ void output_reordering2_test()
 
 	outg = output_create(NULL, "dechunkiser=dummy,outbuff_size=4");
 
-	c = create_chunk(4);
+	c = create_chunk(1,4);
 	res = output_deliver(outg, c);
 	assert(res == 1);
 	destroy_chunk(&c);
 
-	c = create_chunk(6);
+	c = create_chunk(1, 6);
 	res = output_deliver(outg, c);
 	assert(res == 0);
 	destroy_chunk(&c);
 
-	c = create_chunk(8);
+	c = create_chunk(1, 8);
 	res = output_deliver(outg, c);
 	assert(res == 0);
 	destroy_chunk(&c);
 
-	c = create_chunk(10);
+	c = create_chunk(1, 10);
 	res = output_deliver(outg, c);
 	assert(res == 1);
 	destroy_chunk(&c);
 
-	c = create_chunk(9);
+	c = create_chunk(1, 9);
 	res = output_deliver(outg, c);
 	assert(res == 0);
 	destroy_chunk(&c);
 
-	c = create_chunk(7);
+	c = create_chunk(1, 7);
 	res = output_deliver(outg, c);
 	assert(res == 4);
 	destroy_chunk(&c);
@@ -187,32 +189,32 @@ void output_noreordering_test()
 
 	outg = output_create(NULL, "outbuff_reorder=0,dechunkiser=dummy,outbuff_size=3");
 
-	c = create_chunk(4);
+	c = create_chunk(1, 4);
 	res = output_deliver(outg, c);
 	assert(res == 1);
 	destroy_chunk(&c);
 
-	c = create_chunk(3);
+	c = create_chunk(1, 3);
 	res = output_deliver(outg, c);
 	assert(res == 1);
 	destroy_chunk(&c);
 
-	c = create_chunk(6);
+	c = create_chunk(1, 6);
 	res = output_deliver(outg, c);
 	assert(res == 1);
 	destroy_chunk(&c);
 
-	c = create_chunk(5);
+	c = create_chunk(1, 5);
 	res = output_deliver(outg, c);
 	assert(res == 1);
 	destroy_chunk(&c);
 
-	c = create_chunk(15);
+	c = create_chunk(1, 15);
 	res = output_deliver(outg, c);
 	assert(res == 1);
 	destroy_chunk(&c);
 
-	c = create_chunk(18);
+	c = create_chunk(1, 18);
 	res = output_deliver(outg, c);
 	assert(res == 1);
 	destroy_chunk(&c);
@@ -230,32 +232,32 @@ void output_reordering_flawless_test()
 
 	outg = output_create(NULL, "dechunkiser=dummy,outbuff_size=3");
 
-	c = create_chunk(1);
+	c = create_chunk(1, 1);
 	res = output_deliver(outg, c);
 	assert(res == 1);
 	destroy_chunk(&c);
 
-	c = create_chunk(2);
+	c = create_chunk(1, 2);
 	res = output_deliver(outg, c);
 	assert(res == 1);
 	destroy_chunk(&c);
 
-	c = create_chunk(3);
+	c = create_chunk(1, 3);
 	res = output_deliver(outg, c);
 	assert(res == 1);
 	destroy_chunk(&c);
 
-	c = create_chunk(4);
+	c = create_chunk(1, 4);
 	res = output_deliver(outg, c);
 	assert(res == 1);
 	destroy_chunk(&c);
 
-	c = create_chunk(5);
+	c = create_chunk(1,5);
 	res = output_deliver(outg, c);
 	assert(res == 1);
 	destroy_chunk(&c);
 
-	c = create_chunk(6);
+	c = create_chunk(1,6);
 	res = output_deliver(outg, c);
 	assert(res == 1);
 	destroy_chunk(&c);
@@ -273,17 +275,17 @@ void output_ordering_duplicates_test()
 
 	outg = output_create(NULL, "dechunkiser=dummy,outbuff_size=3");
 
-	c = create_chunk(4);
+	c = create_chunk(1,4);
 	res = output_deliver(outg, c);
 	assert(res == 1);
 	destroy_chunk(&c);
 
-	c = create_chunk(6);
+	c = create_chunk(1,6);
 	res = output_deliver(outg, c);
 	assert(res == 0);
 	destroy_chunk(&c);
 
-	c = create_chunk(6);
+	c = create_chunk(1,6);
 	res = output_deliver(outg, c);
 	assert(res == 0);
 	destroy_chunk(&c);
@@ -301,17 +303,17 @@ void output_destroy_test()
 
 	outg = output_create(NULL, "dechunkiser=dummy,outbuff_size=10");
 
-	c = create_chunk(5);
+	c = create_chunk(1,5);
 	res = output_deliver(outg, c);
 	assert(res == 1);
 	destroy_chunk(&c);
 
-	c = create_chunk(9);
+	c = create_chunk(1,9);
 	res = output_deliver(outg, c);
 	assert(res == 0);
 	destroy_chunk(&c);
 
-	c = create_chunk(8);
+	c = create_chunk(1,8);
 	res = output_deliver(outg, c);
 	assert(res == 0);
 	destroy_chunk(&c);

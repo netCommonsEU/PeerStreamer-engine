@@ -23,6 +23,7 @@
 #include<stdio.h>
 #define DEFAULT_CHUNK_INTERVAL (1000000/25)
 
+
 enum data_state {deinit, loading, ready};
 
 struct chunk_interval_estimate {
@@ -30,7 +31,7 @@ struct chunk_interval_estimate {
         uint32_t first_index;
 	uint32_t last_index;
 	uint64_t first_timestamp;
-	double chunk_rate;
+	suseconds_t chunk_interval;
 	enum data_state state;
 };
 
@@ -38,7 +39,7 @@ struct measures {
 	char * filename;
 	struct chunk_interval_estimate **cie;
         int cie_size;
-        suseconds_t avg_chunk_interval;
+        suseconds_t chunk_interval;
 };
 
 
@@ -78,7 +79,7 @@ struct measures * measures_create(const char * filename)
 	m = malloc(sizeof(struct measures));
         m->cie = NULL;
         m->cie_size = 0;
-        m->avg_chunk_interval = DEFAULT_CHUNK_INTERVAL;
+        m->chunk_interval = DEFAULT_CHUNK_INTERVAL;
 	return m;
 }
 
@@ -102,9 +103,9 @@ int8_t reg_chunk_receive(struct measures * m, struct chunk *c)
 	if (m && c)  // chunk interval estimation
 	{
                 struct chunk_interval_estimate * cie = get_cie(m, c->flow_id);
-                int i;
+                int i,count;
                 double s;
-                if(cie)
+		if(cie)
                 { 
                         switch (cie->state) {
                                 case deinit:
@@ -117,22 +118,21 @@ int8_t reg_chunk_receive(struct measures * m, struct chunk *c)
                                 case ready:
                                         if (c->id > (int64_t)cie->last_index)
                                         {
-                                                cie->chunk_rate = (c->id - cie->first_index)/ ((double)(c->timestamp - cie->first_timestamp));
+                                                cie->chunk_interval = ((double)(c->timestamp - cie->first_timestamp))/(c->id - cie->first_index) ;
                                                 cie->last_index = c->id;
                                                 cie->state = ready;
-
-                                                //Calculate the average chunk interval over all ready flows
-                                            
-                                                for (i = 0, s = 0; i < m->cie_size; i++)
+                                                for (i = 0, s = 0, count=0; i < m->cie_size; i++)
                                                 {
-                                                        if(m->cie[i]->state == ready)
-                                                                s += m->cie[i]->chunk_rate;
+							if( cie->state == ready && s < cie->chunk_interval)
+							{
+								s=cie->chunk_interval;
+								count++;
+							}
                                                 }
-                                                //The avg chunk interval is 1/chunk_rate
-                                                if(s>0)
-                                                        m->avg_chunk_interval = 1 / s;
-                                                else
-                                                        m->avg_chunk_interval = DEFAULT_CHUNK_INTERVAL;
+                                                if(count>0)
+                                                        m->chunk_interval = s;
+						else
+							m->chunk_interval = DEFAULT_CHUNK_INTERVAL;
                                         }
                                         break;
                         }
@@ -144,5 +144,5 @@ int8_t reg_chunk_receive(struct measures * m, struct chunk *c)
 
 suseconds_t chunk_interval_measure(const struct measures *m)
 {
-	return m->avg_chunk_interval;
+	return m->chunk_interval;
 }

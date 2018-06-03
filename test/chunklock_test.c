@@ -45,11 +45,11 @@ void chunk_lock_test()
 	locks = chunk_locks_create(2);
 	p = create_peer();
 
-	chunk_lock(NULL, 0, NULL);
-	chunk_lock(locks, 0, NULL);
-	chunk_lock(locks, 0, p);
-	chunk_lock(locks, 1, p);
-	chunk_lock(locks, 3, p);
+	chunk_lock(NULL,1,0, NULL);
+	chunk_lock(locks, 1, 0, NULL);
+	chunk_lock(locks, 2, 0, p);
+	chunk_lock(locks, 1, 1, p);
+	chunk_lock(locks, 2, 3, p);
 
 	chunk_locks_destroy(&locks);
 	destroy_peer(&p);
@@ -62,14 +62,14 @@ void chunk_unlock_test()
 	struct chunk_locks * locks = NULL;
 	struct peer * p;
 
-	chunk_unlock(NULL, 0);
+	chunk_unlock(NULL, 0, 0);
 
 	locks = chunk_locks_create(2);
 	p = create_peer();
 
-	chunk_unlock(locks, 16);
-	chunk_lock(locks, 32, p);
-	chunk_unlock(locks, 32);
+	chunk_unlock(locks, 3, 16);
+	chunk_lock(locks, 3, 32, p);
+	chunk_unlock(locks, 3, 32);
 
 	destroy_peer(&p);
 	chunk_locks_destroy(&locks);
@@ -84,13 +84,13 @@ void chunk_islocked_test()
 	locks = chunk_locks_create(2);
 	p = create_peer();
 
-	assert(chunk_islocked(NULL, 123) == 0);
-	assert(chunk_islocked(locks, 123) == 0);
+	assert(chunk_islocked(NULL, 1, 123) == 0);
+	assert(chunk_islocked(locks, 1, 123) == 0);
 
-	chunk_lock(locks, 32, p);
-	assert(chunk_islocked(locks, 32));
-	chunk_unlock(locks, 32);
-	assert(chunk_islocked(locks, 32) == 0);
+	chunk_lock(locks, 1, 32, p);
+	assert(chunk_islocked(locks, 1, 32));
+	chunk_unlock(locks, 1, 32);
+	assert(chunk_islocked(locks, 1, 32) == 0);
 
 	destroy_peer(&p);
 	chunk_locks_destroy(&locks);
@@ -105,14 +105,14 @@ void chunk_timed_out_test()
 	locks = chunk_locks_create(0);
 	p = create_peer();
 
-	assert(chunk_islocked(NULL, 123) == 0);
-	assert(chunk_islocked(locks, 123) == 0);
+	assert(chunk_islocked(NULL, 1, 123) == 0);
+	assert(chunk_islocked(locks, 1, 123) == 0);
 
-	chunk_lock(locks, 32, p);
+	chunk_lock(locks, 1, 32, p);
 	sleep(1);
-	assert(chunk_islocked(locks, 32) == 0);
-	chunk_unlock(locks, 32);
-	assert(chunk_islocked(locks, 32) == 0);
+	assert(chunk_islocked(locks, 1, 32) == 0);
+	chunk_unlock(locks, 1, 32);
+	assert(chunk_islocked(locks, 1, 32) == 0);
 
 	destroy_peer(&p);
 	chunk_locks_destroy(&locks);

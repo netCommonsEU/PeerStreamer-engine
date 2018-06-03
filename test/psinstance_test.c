@@ -5,21 +5,23 @@
 
 void psinstance_create_test()
 {
-	struct psinstance * ps;
+	struct psinstance * ps=NULL;
 
-	ps = psinstance_create(NULL, -1, NULL);
-	assert(ps == NULL);
-	ps = psinstance_create("null", -1, NULL);
-	assert(ps == NULL);
+	//No parameters
+        ps = psinstance_create(NULL);
+	assert(ps);     
+	psinstance_destroy(&ps);
 
-	ps = psinstance_create("null", 0, "port=6700");
+        //BootStrap node
+	ps = psinstance_create("port=6700");
 	assert(ps);  // source created
 	psinstance_destroy(&ps);
-	
-	ps = psinstance_create("null", 5000, NULL);
+
+        //Invalid port      
+	ps = psinstance_create("port=80000");
 	assert(ps==NULL);  
 
-	ps = psinstance_create("127.0.0.1", 5000, "iface=lo,port=8001");
+	ps = psinstance_create("iface=lo,bs_addr=127.0.0.1,port=6000,bs_port=6001");
 	assert(ps);  
 	psinstance_destroy(&ps);
 
@@ -33,7 +35,7 @@ void psinstance_ip_address_test()
 	
 	assert(psinstance_ip_address(ps, NULL, 80) < 0);
 
-	ps = psinstance_create("127.0.0.1", 5000, "iface=lo,port=8000");
+	ps = psinstance_create("iface=lo,port=8000");
 
 	assert(psinstance_ip_address(ps, NULL, 80) < 0);
 
@@ -50,7 +52,7 @@ void psinstance_port_test()
 
 	assert(psinstance_port(ps) < 0);
 
-	ps = psinstance_create("127.0.0.1", 5000, "iface=lo,port=8000");
+	ps = psinstance_create("iface=lo,port=8000");
 
 	assert(psinstance_port(ps) == 8000);
 

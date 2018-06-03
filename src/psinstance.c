@@ -124,7 +124,6 @@ struct psinstance * psinstance_create(const char * config)
        
                 ps->measure = measures_create(nodeid_static_str(ps->my_sock));
                 ps->topology = topology_create(ps, config);
-                ps->trader = chunk_trader_create(ps, config);
                 streaming_timers_init(&(ps->timers), ps->chunk_offer_interval);
                 ps->chunk_out = output_create(ps->measure, config);
                 
@@ -149,8 +148,8 @@ struct psinstance * psinstance_create(const char * config)
   		        fprintf(stderr,"Running as bootstrap node.\n");
                 }
 
-                
-                ps->input = input_open((ps->inc).filename, 
+                if(ps)                
+                        ps->input = input_open((ps->inc).filename, 
                                         (ps->inc).fds, (ps->inc).fds_size, config);
         }
         else

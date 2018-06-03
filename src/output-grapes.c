@@ -34,7 +34,6 @@
 #include "output.h"
 #include "dbg.h"
 
-
 /*
  Use a single output module (AKA dechunkiser) for all flows.
  Put different chunks in different buffers, play the chunks in the buffer of
@@ -83,25 +82,15 @@ struct output_buffer * output_buffer_init(struct chunk_output * chout, int flowi
 struct output_buffer * get_buffer(struct chunk_output * chout, int flow_id)
 {
         int i;
-        struct output_buffer ** new_buffs;
-        struct output_buffer *ret;
+        struct output_buffer *ret = NULL;
         
         for( i=0; i<chout->buff_number; i++)
                 if(chout->buffs[i]->flowid==flow_id)
                         return chout->buffs[i];
 
         //Didn't found -> create a new buffer
-        new_buffs = malloc(sizeof(struct output_buffer * ) * (chout->buff_number +1));
-        if(!new_buffs)
-                return NULL;
-
-        if(chout->buffs)
-        {
-                memcpy(new_buffs, chout->buffs,sizeof(struct output_buffer * ) * (chout->buff_number));
-                free(chout->buffs);
-        }
-
-        chout->buffs=new_buffs;
+        
+        chout->buffs = realloc(chout->buffs,sizeof(struct output_buffer * ) * (chout->buff_number+1));
         ret=chout->buffs[chout->buff_number] = output_buffer_init(chout,flow_id);
         chout->buff_number+=1;
         dprintf("Allocated new output buffer for flow %i; total number of output buffer is %i\n",flow_id,chout->buff_number);
@@ -162,10 +151,10 @@ void output_buffer_print(const struct chunk_output * co)
 	{
 		for(j=0; j<co->buff_number; j++)
 		{
-			fprintf(stderr, "%i [%i]: [",j, co->buffs[j]->flowid);
+			dprintf( "%i [%i]: [",j, co->buffs[j]->flowid);
 			for(i=0; i<co->buffs[j]->buff_length; i++)
-			        fprintf(stderr, "| %d |", co->buffs[j]->buff[i].id);
-			fprintf(stderr, "]\n");
+			        dprintf( "| %d |", co->buffs[j]->buff[i].id);
+			dprintf( "]\n");
 		}
 
 	}
@@ -188,6 +177,7 @@ void output_destroy(struct chunk_output ** outg)
 			}
 			free((*outg)->buffs[j]);
 		}
+                free((*outg)->buffs);
 
 		if((*outg)->out)
 			out_stream_close((*outg)->out);
@@ -231,7 +221,7 @@ int output_deliver_buffer(struct output_stream *out, struct output_buffer* outb,
 	int res = -1;
 	int new_pos;
 
-	if (outb && c)
+        if (outb && c)
 	{
 		res = 0;
 		if (outb->reorder)
@@ -275,21 +265,29 @@ int output_deliver_buffer(struct output_stream *out, struct output_buffer* outb,
 **/
 int output_deliver(struct chunk_output* cout, const struct chunk *c)
 {
-	int res;
+        
+	int res=-1;
 	struct output_buffer * buff=NULL;
-
-	buff = get_buffer(cout,c->flow_id);
-	if (buff)
-		res = output_deliver_buffer(cout->out,buff, c);
-	else{
-		//Error allocating new buffer, just play the chunk
-		dprintf("Error allocating a new output buffer\n");
-		chunk_write(cout->out, c);
-		res=1;
-	}
+        if(c && cout)
+        {
+                buff = get_buffer(cout,c->flow_id);
+                if (buff)
+                {
+                        res = output_deliver_buffer(cout->out,buff, c);
 #ifdef LOG_CHUNK
-	dprintf("Delivered chunk %i [%i]\n", c->id, c->flow_id);
-	output_buffer_print(cout);
-#endif
+                        dprintf("Delivered chunk %i [%i]\n", c->id, c->flow_id);
+                        output_buffer_print(cout);
+#endif          
+                }
+                else{
+                        //Error allocating new buffer, just play the chunk
+                        dprintf("Error allocating a new output buffer\n");
+                        chunk_write(cout->out, c);
+                }
+        }
+        else
+        {
+                dprintf("Error delivering chunk: NULL buffer or output\n");
+        }
 	return res;
 }
