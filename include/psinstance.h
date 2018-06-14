@@ -37,6 +37,11 @@ void psinstance_destroy(struct psinstance ** ps);
 
 int psinstance_poll(struct psinstance *ps, suseconds_t);
 
+/********************       Utils        ***********************/
+int psinstance_ip_address(const struct psinstance *ps, char * ip, int len);
+
+int psinstance_port(const struct psinstance *ps);
+
 /********************Additional Interface***********************/
 int8_t psinstance_send_offer(struct psinstance * ps);
 

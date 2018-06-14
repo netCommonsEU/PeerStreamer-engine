@@ -353,3 +353,19 @@ suseconds_t psinstance_network_periodic(struct psinstance * ps)
 	}
 	return delay;
 }
+
+int psinstance_ip_address(const struct psinstance *ps, char * ip, int len)
+{
+	int res = -1;
+	if (ps && ps->my_sock)
+		res = node_ip(ps->my_sock, ip, len);
+	return res;
+}
+
+int psinstance_port(const struct psinstance *ps)
+{
+	int res = -1;
+	if (ps && ps->my_sock)
+		return node_port(ps->my_sock);
+	return res;
+}

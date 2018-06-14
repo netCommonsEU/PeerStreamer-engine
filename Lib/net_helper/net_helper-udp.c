@@ -343,17 +343,20 @@ int node_ip(const struct nodeID *s, char *ip, int len)
 {
 	const char *res = NULL;
 
-	switch (s->addr.ss_family)
+	if (s && ip)
 	{
-		case AF_INET:
-			res = inet_ntop(s->addr.ss_family, &((const struct sockaddr_in *)&s->addr)->sin_addr, ip, len);
-			break;
-		case AF_INET6:
-			res = inet_ntop(s->addr.ss_family, &((const struct sockaddr_in6 *)&s->addr)->sin6_addr, ip, len);
-			break;
+		switch (s->addr.ss_family)
+		{
+			case AF_INET:
+				res = inet_ntop(s->addr.ss_family, &((const struct sockaddr_in *)&s->addr)->sin_addr, ip, len);
+				break;
+			case AF_INET6:
+				res = inet_ntop(s->addr.ss_family, &((const struct sockaddr_in6 *)&s->addr)->sin6_addr, ip, len);
+				break;
+		}
+		if (!res && len)
+			ip[0] = '\0';
 	}
-	if (!res && len)
-		ip[0] = '\0';
 
 	return res ? 0 : -1;
 }
@@ -362,13 +365,16 @@ int node_port(const struct nodeID *s)
 {
 	int res = -1;
 
-	switch (s->addr.ss_family) {
-		case AF_INET:
-			res = ntohs(((const struct sockaddr_in *) &s->addr)->sin_port);
-			break;
-		case AF_INET6:
-			res = ntohs(((const struct sockaddr_in6 *)&s->addr)->sin6_port);
-			break;
+	if (s)
+	{
+		switch (s->addr.ss_family) {
+			case AF_INET:
+				res = ntohs(((const struct sockaddr_in *) &s->addr)->sin_port);
+				break;
+			case AF_INET6:
+				res = ntohs(((const struct sockaddr_in6 *)&s->addr)->sin6_port);
+				break;
+		}
 	}
 	return res;
 }
