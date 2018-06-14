@@ -99,7 +99,7 @@ void output_reordering_test()
 	struct chunk_output * outg;
 	int res;
 
-	outg = output_create(NULL, "dechunkiser=dummy,outbuff_length=3");
+	outg = output_create(NULL, "dechunkiser=dummy,outbuff_size=3");
 
 	c = create_chunk(4);
 	res = output_deliver(outg, c);
@@ -142,7 +142,7 @@ void output_reordering2_test()
 	struct chunk_output * outg;
 	int res;
 
-	outg = output_create(NULL, "dechunkiser=dummy,outbuff_length=4");
+	outg = output_create(NULL, "dechunkiser=dummy,outbuff_size=4");
 
 	c = create_chunk(4);
 	res = output_deliver(outg, c);
@@ -185,7 +185,7 @@ void output_noreordering_test()
 	struct chunk_output * outg;
 	int res;
 
-	outg = output_create(NULL, "outbuff_reorder=0,dechunkiser=dummy,outbuff_length=3");
+	outg = output_create(NULL, "outbuff_reorder=0,dechunkiser=dummy,outbuff_size=3");
 
 	c = create_chunk(4);
 	res = output_deliver(outg, c);
@@ -228,7 +228,7 @@ void output_reordering_flawless_test()
 	struct chunk_output * outg;
 	int res;
 
-	outg = output_create(NULL, "dechunkiser=dummy,outbuff_length=3");
+	outg = output_create(NULL, "dechunkiser=dummy,outbuff_size=3");
 
 	c = create_chunk(1);
 	res = output_deliver(outg, c);
@@ -271,7 +271,7 @@ void output_ordering_duplicates_test()
 	struct chunk_output * outg;
 	int res;
 
-	outg = output_create(NULL, "dechunkiser=dummy,outbuff_length=3");
+	outg = output_create(NULL, "dechunkiser=dummy,outbuff_size=3");
 
 	c = create_chunk(4);
 	res = output_deliver(outg, c);
@@ -299,7 +299,7 @@ void output_destroy_test()
 	struct chunk_output * outg;
 	int res;
 
-	outg = output_create(NULL, "dechunkiser=dummy,outbuff_length=10");
+	outg = output_create(NULL, "dechunkiser=dummy,outbuff_size=10");
 
 	c = create_chunk(5);
 	res = output_deliver(outg, c);

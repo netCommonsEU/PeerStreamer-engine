@@ -27,12 +27,11 @@
 #include<net_helper.h>
 #include<output.h>
 #include<input.h>
-#include<streaming.h>
+#include<chunk_trader.h>
 #include<measures.h>
 #include<topology.h>
 #include<grapes_msg_types.h>
 #include<dbg.h>
-#include<chunk_signaling.h>
 #include<streaming_timers.h>
 #include<pstreamer_event.h>
 
@@ -41,14 +40,12 @@ struct psinstance {
 	struct chunk_output * chunk_out;
 	struct measures * measure;
 	struct topology * topology;
-	struct streaming_context * streaming;
+	struct chunk_trader * trader;
 	struct input_context inc;
+	struct input_desc * input;
 	struct streaming_timers timers;
 	char * iface;
 	int port;
-	int chunkbuffer_size;
-	uint8_t num_offers;
-	uint8_t chunks_per_offer;
 	suseconds_t chunk_time_interval; // microseconds
 	suseconds_t chunk_offer_interval; // microseconds
 	int source_multiplicity;
@@ -65,7 +62,6 @@ int config_parse(struct psinstance * ps,const char * config)
 	tmp_str = grapes_config_value_str_default(tags, "iface", NULL);
 	ps->iface = tmp_str ? strdup(tmp_str) : NULL;
 	grapes_config_value_int_default(tags, "port", &(ps->port), 0);
-	grapes_config_value_int_default(tags, "chunkbuffer_size", &(ps->chunkbuffer_size), 50);
 	grapes_config_value_int_default(tags, "source_multiplicity", &(ps->source_multiplicity), 3);
 
 	tmp_str = grapes_config_value_str_default(tags, "filename", NULL);
@@ -110,8 +106,6 @@ struct psinstance * psinstance_create(const char * srv_ip, const int srv_port, c
 		ps = malloc(sizeof(struct psinstance));
 		memset(ps, 0, sizeof(struct psinstance));
 
-		ps->num_offers = 1;
-		ps->chunks_per_offer = 1;
 		ps->chunk_time_interval = 0;
 		ps->chunk_offer_interval = 1000000/25;  // microseconds divided by frame (chunks) per second
 		config_parse(ps, config);
@@ -120,6 +114,7 @@ struct psinstance * psinstance_create(const char * srv_ip, const int srv_port, c
 		{
 			ps->measure = measures_create(nodeid_static_str(ps->my_sock));
 			ps->topology = topology_create(ps, config);
+			ps->trader = chunk_trader_create(ps, config);
 			streaming_timers_init(&(ps->timers), ps->chunk_offer_interval);
 			ps->chunk_out = NULL;  // To be used as a flag if current role is source or peer role
 			if (srv_port)
@@ -128,14 +123,16 @@ struct psinstance * psinstance_create(const char * srv_ip, const int srv_port, c
 				if (srv)
 				{
 					ps->inc.fds[0] = -1;
-					ps->streaming = streaming_create(ps, NULL, config);
+					ps->input = NULL;
 					topology_node_insert(ps->topology, srv);
 					ps->chunk_out = output_create(ps->measure, config);
 					nodeid_free(srv);
 				} else
 					psinstance_destroy(&ps);
-			} else  // creating a source peer
-				ps->streaming = streaming_create(ps, &(ps->inc), config);
+			} else {  // creating a source peer
+				ps->input = input_open((ps->inc).filename, (ps->inc).fds, (ps->inc).fds_size, config);
+				(ps->inc).fds[(ps->inc).fds_size] = -1;
+			}
 		}
 		else
 			psinstance_destroy(&ps);
@@ -154,12 +151,14 @@ void psinstance_destroy(struct psinstance ** ps)
 			topology_destroy(&(*ps)->topology);
 		if ((*ps)->chunk_out)
 			output_destroy(&(*ps)->chunk_out);
-		if ((*ps)->streaming)
-			streaming_destroy(&(*ps)->streaming);
+		if ((*ps)->trader)
+			chunk_trader_destroy(&(*ps)->trader);
 		if ((*ps)->iface)
 			free((*ps)->iface);
 		if ((*ps)->my_sock)
 			net_helper_deinit((*ps)->my_sock);
+		if ((*ps)->input)
+			input_close((*ps)->input);
 		free(*ps);
 		*ps = NULL;
 	}
@@ -173,11 +172,6 @@ struct nodeID * psinstance_nodeid(const struct psinstance * ps)
 int8_t psinstance_is_source(const struct psinstance * ps)
 {
 	return ps->chunk_out ? 0 : 1;
-}
-
-int  psinstance_chunkbuffer_size(const struct psinstance * ps)
-{
-	return ps->chunkbuffer_size;
 }
 
 struct topology * psinstance_topology(const struct psinstance * ps)
@@ -195,24 +189,14 @@ struct chunk_output * psinstance_output(const struct psinstance * ps)
 	return ps->chunk_out;
 }
 
-uint8_t psinstance_num_offers(const struct psinstance * ps)
+const struct chunk_trader * psinstance_trader(const struct psinstance * ps)
 {
-	return ps->num_offers;
-}
-
-uint8_t psinstance_chunks_per_offer(const struct psinstance * ps)
-{
-	return ps->chunks_per_offer;
-}
-
-const struct streaming_context * psinstance_streaming(const struct psinstance * ps)
-{
-	return ps->streaming;
+	return ps->trader;
 }
 
 int8_t psinstance_send_offer(struct psinstance * ps)
 {
-	send_offer(ps->streaming);
+	chunk_trader_send_offer(ps->trader);
 	return 0;
 }
 
@@ -223,13 +207,19 @@ int8_t psinstance_inject_chunk(struct psinstance * ps)
 
 	if (ps && psinstance_is_source(ps))
 	{
-		new_chunk = generated_chunk(ps->streaming, &(ps->chunk_time_interval));
-		if(new_chunk && add_chunk(ps->streaming, new_chunk))
-			inject_chunk(ps->streaming, new_chunk, ps->source_multiplicity);
+		new_chunk = input_chunk(ps->input, &(ps->chunk_time_interval));
+		if(new_chunk) 
+		{
+			if(!chunk_trader_add_chunk(ps->trader, new_chunk))
+			{
+				chunk_trader_push_chunk(ps->trader, new_chunk, ps->source_multiplicity);
+				free(new_chunk);
+			}
+			else
+				chunk_destroy(&new_chunk);
+		}
 		else
 			res = -1;
-		if(new_chunk)
-			free(new_chunk);
 	} else
 		res = 1;
 	return res;
@@ -240,6 +230,7 @@ int8_t psinstance_handle_msg(struct psinstance * ps)
 {
 	uint8_t buff[MSG_BUFFSIZE];
 	struct nodeID *remote = NULL;
+	struct chunk * c;
 	int len;
 	int8_t res = 0;
 
@@ -262,19 +253,30 @@ int8_t psinstance_handle_msg(struct psinstance * ps)
 				if(psinstance_is_source(ps))
 					dtprintf("\tDiscarded as playing source role\n");
 				else
-					received_chunk(ps->streaming, remote, buff, len);
+				{
+					c = chunk_trader_parse_chunk(ps->trader, remote, buff, len);
+					if (c)
+					{
+						if (!chunk_trader_add_chunk(ps->trader, c))
+						{
+							reg_chunk_receive(ps->measure, c);
+							output_deliver(ps->chunk_out, c);
+							free(c);
+						} else
+							chunk_destroy(&c);
+					}
+				}
 				res = 2;
 				break;
 			case MSG_TYPE_SIGNALLING:
 				dtprintf("Sign message received:\n");
-				sigParseData(ps, remote, buff, len);
+				chunk_trader_msg_parse(ps->trader, remote, buff, len);
 				res = 3;
 				break;
 			default:
 				fprintf(stderr, "Unknown Message Type %x\n", buff[0]);
 				res = -2;
 		}
-		ps->chunk_offer_interval = streaming_offer_interval(ps->streaming);
 
 	if (remote)
 		nodeid_free(remote);
@@ -298,6 +300,7 @@ int psinstance_poll(struct psinstance *ps, suseconds_t delta)
 				dtprintf("Offer time!\n");
 				psinstance_send_offer(ps);
 				dtprintf("interval: %lu\n", ps->chunk_offer_interval);
+				ps->chunk_offer_interval = chunk_trader_offer_interval(ps->trader);
 				streaming_timers_update_offer_time(&ps->timers, ps->chunk_offer_interval);
 				break;
 			case INJECT_ACTION:

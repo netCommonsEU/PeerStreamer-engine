@@ -1,4 +1,4 @@
-GRAPES ?= $(PWD)/../grapes
+GRAPES ?= $(PWD)/../GRAPES
 NET_HELPER ?= $(PWD)/Lib/net_helper
 LIBNETHELPER=$(NET_HELPER)/libnethelper.a
 LIBGRAPES=$(GRAPES)/src/libgrapes.a

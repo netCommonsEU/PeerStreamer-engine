@@ -39,7 +39,7 @@
 #include "net_helpers.h"
 #include "dbg.h"
 #include "measures.h"
-#include "streaming.h"
+#include "chunk_trader.h"
 #include "peer_metadata.h"
 
 extern peer_deinit_f peer_deinit;
@@ -87,7 +87,7 @@ void peerset_print(const struct peerset * pset, const char * name)
 void update_metadata(struct topology * t)
 {
 	metadata_update(&(t->my_metadata), 
-			psinstance_is_source(t->ps) ? 0 : psinstance_chunkbuffer_size(t->ps),
+			psinstance_is_source(t->ps) ? 0 : chunk_trader_buffer_size(psinstance_trader(t->ps)),
 			peerset_size(t->neighbourhood));
 	psample_change_metadata(t->tc, &(t->my_metadata), sizeof(struct metadata));
 }
@@ -103,17 +103,16 @@ struct peer * topology_get_peer(struct topology * t, const struct nodeID * id)
 
 int topology_init(struct topology * t, const struct psinstance * ps, const char *config)
 {
+	struct tag * tags;
+	int timeout;
+
 	peer_deinit = peer_data_deinit;
 	peer_init = peer_data_init;
-
-	struct tag * tags;
 
 	tags = grapes_config_parse(config);
 
 	bind_msg_type(MSG_TYPE_NEIGHBOURHOOD);
 	bind_msg_type(MSG_TYPE_TOPOLOGY);
-	t->tout_bmap.tv_sec = 20;
-	t->tout_bmap.tv_usec = 0;
 	t->ps = ps;
 
 	t->neighbourhood = peerset_init(0);
@@ -124,6 +123,9 @@ int topology_init(struct topology * t, const struct psinstance * ps, const char 
 	t->topo_out = true; //peer selects out-neighbours
 	t->topo_in = true; //peer selects in-neighbours (combined means bidirectional)
 	grapes_config_value_int_default(tags, "neighbourhood_size", &(t->neighbourhood_target_size), DEFAULT_PEER_NEIGH_SIZE);
+	grapes_config_value_int_default(tags, "peer_timeout", &timeout, 10);
+	t->tout_bmap.tv_sec = timeout;
+	t->tout_bmap.tv_usec = 0;
 
 	t->tc = psample_init(psinstance_nodeid(ps), &(t->my_metadata), sizeof(struct metadata), config);
 	update_metadata(t);
@@ -164,9 +166,8 @@ struct peer * neighbourhood_add_peer(struct topology * t, const struct nodeID *i
 			p = peerset_get_peer(t->neighbourhood,id);
 			peerset_push_peer(t->locked_neighs,p);
 		}
-		measures_add_node(psinstance_measures(t->ps), p->id);
 		// fprintf(stderr,"[DEBUG] sending bmap to peer %s \n",nodeid_static_str(id));
-		send_bmap(psinstance_streaming(t->ps), id);
+		chunk_trader_send_bmap(psinstance_trader(t->ps), id);
 	}
 	return p;
 }
@@ -228,10 +229,7 @@ void topology_message_parse(struct topology * t, struct nodeID *from, const uint
 	switch(buff[0]) {
 		case MSG_TYPE_NEIGHBOURHOOD:
 			if (t->topo_in)
-			{
 				neighbourhood_message_parse(t, from, buff+1,len);
-				reg_neigh_size(psinstance_measures(t->ps), peerset_size(t->neighbourhood));
-			}
 			break;
 		case MSG_TYPE_TOPOLOGY:
 			psample_parse_data(t->tc,buff,len);
@@ -424,7 +422,6 @@ void topology_signal_change(struct topology *t, const struct peerset const * old
 {
 	const struct peer * p;
 	int i;
-  reg_neigh_size(psinstance_measures(t->ps), peerset_size(t->neighbourhood));
 
 	// advertise changes
 	if(t->topo_out)

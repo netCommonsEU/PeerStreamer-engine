@@ -56,7 +56,9 @@ void show_help()
 	fprintf(stdout, "\tsource_multipolicity=<int>:\tnumber of chunks the source pushes in seeding (default=3)\n");
 	fprintf(stdout, "\tfilename=<string>:\t\tfilename of a media content to be streamed (source side only)\n");
 	fprintf(stdout, "\tAF=INET|INET6:\t\t\taddress family, IPv4 or IPv6 (default=INET)\n");
-	fprintf(stdout, "\toffer_per_period=<int>:\t\tamount of offer to perform per offer period (default=1)\n");
+	fprintf(stdout, "\toffer_per_period=<int>:\t\tnumber of offers per approximated chunk interval (default=1)\n");
+	fprintf(stdout, "\tpeers_per_offer=<int>:\t\tnumber of peers to offer chunks to (default=1)\n");
+	fprintf(stdout, "\tchunks_per_peer_offer=<int>:\t\tmax number of chunks to be sent to a peer (default=1)\n");
 	fprintf(stdout, "\tneighbourhood_size=<int>:\ttarget neighbourhood size (default=30)\n");
 	fprintf(stdout, "\tpeer_timeout=<int>:\t\ttimeout in seconds after which a peer is considered dead (default=10)\n");
 	fprintf(stdout, "\tdist_type=random|turbo:\t\tP2P distribution policy (default=random)\n");

@@ -21,8 +21,14 @@
 #include <sys/time.h>
 #include <stdio.h>
 #include <stdarg.h>
+#include <time.h>
+#include <inttypes.h>
 
-#include "dbg.h"
+#include<dbg.h>
+#include<chunk_trader.h>
+#include<net_helpers.h>
+#include <peerset.h>
+#include <chunkbuffer.h>
 
 
 int ftprintf(FILE *stream, const char *format, ...)
@@ -39,4 +45,101 @@ int ftprintf(FILE *stream, const char *format, ...)
   va_end (ap);
   
   return ret;
+}
+
+uint64_t gettimeofday_in_us(void)
+{
+	struct timeval what_time; //to store the epoch time
+
+	gettimeofday(&what_time, NULL);
+	return what_time.tv_sec * 1000000ULL + what_time.tv_usec;
+}
+
+void log_signal(const struct nodeID *fromid,const struct nodeID *toid,const int cidset_size,uint16_t trans_id,enum signaling_type type,const char *flag)
+{
+	char typestr[24];
+	char sndr[NODE_STR_LENGTH],rcvr[NODE_STR_LENGTH];
+	node_addr(fromid,sndr,NODE_STR_LENGTH);
+	node_addr(toid,rcvr,NODE_STR_LENGTH);
+
+	switch (type)
+	{
+		case sig_offer:
+			sprintf(typestr,"%s","OFFER_SIG");
+			break;
+		case sig_accept:
+			sprintf(typestr,"%s","ACCEPT_SIG");
+			break;
+		case sig_request:
+			sprintf(typestr,"%s","REQUEST_SIG");
+			break;
+		case sig_deliver:
+			sprintf(typestr,"%s","DELIVER_SIG");
+			break;
+		case sig_send_buffermap:
+			sprintf(typestr,"%s","SEND_BMAP_SIG");
+			break;
+		case sig_request_buffermap:
+			sprintf(typestr,"%s","REQUEST_BMAP_SIG");
+			break;
+		case sig_ack:
+			sprintf(typestr,"%s","CHUNK_ACK_SIG");
+			break;
+		default:
+			sprintf(typestr,"%s","UNKNOWN_SIG");
+
+	}
+	fprintf(stderr,"[SIGNAL_LOG],%"PRIu64",%s,%s,%d,%s,%s\n",gettimeofday_in_us(),sndr,rcvr,trans_id,typestr,flag);
+}
+
+void log_chunk(const struct nodeID *from,const struct nodeID *to,const struct chunk *c,const char * note)
+{
+	// semantic: [CHUNK_LOG],log_date,sender,receiver,id,size(bytes),chunk_timestamp,hopcount,notes
+	char sndr[NODE_STR_LENGTH] = "ND",rcvr[NODE_STR_LENGTH] = "ND";
+	if (from)
+	node_addr(from,sndr,NODE_STR_LENGTH);
+	if (to)
+		node_addr(to,rcvr,NODE_STR_LENGTH);
+
+	if (c)
+		fprintf(stderr,"[CHUNK_LOG],%"PRIu64",%s,%s,%d,%d,%"PRIu64",%i,%s\n",gettimeofday_in_us(),sndr,rcvr,c->id,c->size,c->timestamp,chunk_attributes_get_hopcount(c),note);
+	else
+		fprintf(stderr,"[CHUNK_LOG],%"PRIu64",%s,%s,%d,%d,%d,%i,%s\n",gettimeofday_in_us(),sndr,rcvr,-1,-1,0,0,note);
+}
+
+void log_neighbourhood(const struct psinstance * ps)
+{
+  struct peerset * pset;
+  const struct peer * p;
+  int psetsize,i;
+  uint64_t now;
+  char me[NODE_STR_LENGTH];
+
+  node_addr(psinstance_nodeid(ps), me, NODE_STR_LENGTH);
+  pset = topology_get_neighbours(psinstance_topology(ps));
+  psetsize = peerset_size(pset);
+  now = gettimeofday_in_us();
+  peerset_for_each(pset,p,i)
+    fprintf(stderr,"[NEIGHBOURHOOD],%"PRIu64",%s,%s,%d\n",now,me,nodeid_static_str(p->id),psetsize);
+
+}
+
+void log_chunk_error(const struct nodeID *from,const struct nodeID *to,const struct chunk *c,int error)
+{
+	switch (error) {
+		case E_CB_OLD:
+			log_chunk(from,to,c,"TOO_OLD");
+			break;
+		case E_CB_DUPLICATE:
+			log_chunk(from,to,c,"DUPLICATED");
+			break;
+		case E_CANNOT_PARSE:
+			log_chunk(from,to,NULL,"CANNOT_PARSE");
+			break;
+		case E_CACHE_MISS:
+			log_chunk(from,to,NULL,"CACHE_MISS");
+			break;
+		default:
+			log_chunk(from,to,c,"ERROR");
+	} 
 }

@@ -46,4 +46,6 @@ void input_close(struct input_desc *s);
  */
 int input_get(struct input_desc *s, struct chunk *c);
 
+struct chunk *input_chunk(struct input_desc * s, suseconds_t *delta);
+
 #endif	/* INPUT_H */

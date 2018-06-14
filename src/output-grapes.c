@@ -74,7 +74,7 @@ struct chunk_output * output_create(struct measures * ms, const char *config)
 	outg->head = 0;
 
 	tags = grapes_config_parse(config);
-	grapes_config_value_int_default(tags, "outbuff_length", &len, 75);
+	grapes_config_value_int_default(tags, "outbuff_size", &len, 75);
 	outg->buff_length = len > 0 ? len : 75;
 	grapes_config_value_int_default(tags, "outbuff_reorder", &len, 1);
 	outg->reorder = len ? 1 : 0;

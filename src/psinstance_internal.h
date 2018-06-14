@@ -30,19 +30,13 @@ struct nodeID * psinstance_nodeid(const struct psinstance * ps);
 
 int8_t psinstance_is_source(const struct psinstance * ps);
 
-int  psinstance_chunkbuffer_size(const struct psinstance * ps);
-
 struct topology * psinstance_topology(const struct psinstance * ps);
 
 struct measures * psinstance_measures(const struct psinstance * ps);
 
 struct chunk_output * psinstance_output(const struct psinstance * ps);
 
-const struct streaming_context * psinstance_streaming(const struct psinstance * ps);
-
-uint8_t psinstance_chunks_per_offer(const struct psinstance * ps);
-
-uint8_t psinstance_num_offers(const struct psinstance * ps);
+const struct chunk_trader * psinstance_trader(const struct psinstance * ps);
 
 
 #endif

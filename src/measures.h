@@ -23,8 +23,10 @@
 
 #include<stdint.h>
 #include<stdbool.h>
+
 #include<net_helper.h>
 #include<psinstance.h>
+#include<chunk.h>
 
 struct measures;
 
@@ -33,19 +35,10 @@ int8_t measures_add_node(struct measures * m, struct nodeID * id);
 void measures_destroy(struct measures ** m);
 
 /*************Storing functions***************/
-int8_t reg_chunk_playout(struct measures * m, int id, bool b, uint64_t timestamp);
-int8_t reg_chunk_duplicate(struct measures * m);
-int8_t reg_neigh_size(struct measures * m, size_t t);
-int8_t reg_offer_accept_in(struct measures * m, uint8_t t);
 
-int8_t reg_chunk_receive(struct measures * m, int cid, uint64_t ctimestamp, int hopcount, int8_t old, int8_t duplicate);
-int8_t reg_offer_accept_out(struct measures * m, uint8_t t);
-int8_t reg_chunk_send(struct measures * m, int id);
-int8_t offer_accept_rtt_measure(const struct nodeID * id, uint64_t rtt);
+int8_t reg_chunk_receive(struct measures * m, struct chunk *c);
 
 /*************Get functions***************/
-int8_t reception_measure(const struct nodeID * id);
-int8_t timeout_reception_measure(const struct nodeID * id);
 suseconds_t chunk_interval_measure(const struct measures * m);
 
 #endif
