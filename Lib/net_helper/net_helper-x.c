@@ -443,8 +443,16 @@ struct nodeID *nodeid_undump(const uint8_t *b, int *len)
 
 void net_helper_deinit(struct nodeID *s)
 {
+	struct net_msg * msg;
+
 	if (s)
 	{
+		msg = network_manager_pop_outgoing_net_msg(s->nm);
+		while (msg)  // we flush everything in the outgoing queue
+		{
+			net_helper_send_msg(s, msg);
+			msg = network_manager_pop_outgoing_net_msg(s->nm);
+		}
 		if (s->fd >= 0)
 		{
 			close(s->fd);

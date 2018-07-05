@@ -192,7 +192,7 @@ void topology_remove_peer(struct topology * t, const struct nodeID *id)
 		peerset_pop_peer(t->locked_neighs, id);
 		psample_remove_peer(t->tc, id);
 		peerset_remove_peer(t->neighbourhood, id);
-		// peerset_remove_peer(t->swarm_bucket, id);
+		peerset_remove_peer(t->swarm_bucket, id);
 	}
 }
 
