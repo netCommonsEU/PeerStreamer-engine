@@ -1,7 +1,7 @@
 SRC=$(wildcard *.c)
 OBJS=$(SRC:.c=.test)
 
-GRAPES ?= $(PWD)/../../grapes
+GRAPES ?= $(PWD)/../../GRAPES
 NET_HELPER ?= $(PWD)/../Lib/net_helper
 
 TARGET=../src/libpstreamer.a

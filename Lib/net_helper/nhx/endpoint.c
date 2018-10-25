@@ -67,9 +67,11 @@ void endpoint_destroy(struct endpoint ** e)
 int8_t endpoint_cmp(const void * e1, const void *e2)
 {
 	if (e1 && e2)
+	{
 		if (nodeid_equal(((struct endpoint *)e1)->node, ((struct endpoint *)e2)->node))
 			return 0;
 		return nodeid_cmp(((struct endpoint *)e1)->node, ((struct endpoint *)e2)->node) > 0 ? 1 : -1;
+	}
 	return 0;
 }
 
