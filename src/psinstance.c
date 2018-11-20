@@ -51,16 +51,13 @@ struct psinstance {
 	suseconds_t chunk_offer_interval; // microseconds
 	int source_multiplicity;
 	enum L3PROTOCOL l3;
-
-        int bs_port;
-        char *bs_addr;
-
 };
 
-int config_parse(struct psinstance * ps, const char * config)
+int config_parse(struct psinstance * ps, const char * config, char **bs_addr)
 {
 	struct tag * tags;
 	const char *tmp_str;
+	int bs_port;
 
 	tags = grapes_config_parse(config);
 
@@ -69,10 +66,9 @@ int config_parse(struct psinstance * ps, const char * config)
 	grapes_config_value_int_default(tags, "port", &(ps->port), 0);
 	grapes_config_value_int_default(tags, "source_multiplicity", &(ps->source_multiplicity), 3);
 
-
-        tmp_str = grapes_config_value_str_default(tags, "bs_addr", NULL);
-        ps->bs_addr = tmp_str ? strdup(tmp_str) : NULL;
-        grapes_config_value_int_default(tags, "bs_port", &(ps->bs_port), 6000);
+	tmp_str = grapes_config_value_str_default(tags, "bs_addr", NULL);
+	(*bs_addr) = tmp_str ? strdup(tmp_str) : NULL;
+	grapes_config_value_int_default(tags, "bs_port", &bs_port, 6000);
         
 	tmp_str = grapes_config_value_str_default(tags, "filename", NULL);
 	strcpy((ps->inc).filename, tmp_str ? tmp_str : "");
@@ -80,24 +76,28 @@ int config_parse(struct psinstance * ps, const char * config)
 	ps->l3 = tmp_str && (strcmp(tmp_str, "INET6") == 0) ? IP6 : IP4;
 
 	free(tags);
-	return 0;
+	return bs_port;
 }
 
 int node_init(struct psinstance * ps, const char * config)
 {
 	char * my_addr;
 
-	if (ps->iface)
-		my_addr = iface_addr(ps->iface, ps->l3);
-	else
-		my_addr = default_ip_addr(ps->l3);
-	if (my_addr == NULL)
+	if (ps && ps->port < 65536)
 	{
-		fprintf(stderr, "[ERROR] cannot get a valid ip address\n");
-		return -1;
-	}
-	ps->my_sock = net_helper_init(my_addr, ps->port, config);
-	free(my_addr);
+		if (ps->iface)
+			my_addr = iface_addr(ps->iface, ps->l3);
+		else
+			my_addr = default_ip_addr(ps->l3);
+		if (my_addr == NULL)
+		{
+			fprintf(stderr, "[ERROR] cannot get a valid ip address\n");
+			return -1;
+		}
+		ps->my_sock = net_helper_init(my_addr, ps->port, config);
+		free(my_addr);
+	} else
+		ps->my_sock = 0;
 
 	if (ps->my_sock)
 		return 0;
@@ -108,55 +108,44 @@ int node_init(struct psinstance * ps, const char * config)
 struct psinstance * psinstance_create(const char * config)
 {
 	struct psinstance * ps = NULL;
-	struct nodeID * srv;
-	int res;
+	struct nodeID * bs;
+	char * bs_addr = NULL;
+	int res, bs_port;
 
 	ps = malloc(sizeof(struct psinstance));
-        memset(ps, 0, sizeof(struct psinstance));
+	memset(ps, 0, sizeof(struct psinstance));
         
-        ps->chunk_time_interval = 0;
-        ps->chunk_offer_interval = 1000000/25;  // microseconds divided by frame (chunks) per second
-        config_parse(ps, config);
-        res = node_init(ps, config);
-        if (ps->port >= 0 && ps->port < 65536 && res == 0)
-        {
-                ps->trader = chunk_trader_create(ps, config);
-       
-                ps->measure = measures_create(nodeid_static_str(ps->my_sock));
-                ps->topology = topology_create(ps, config);
-                streaming_timers_init(&(ps->timers), ps->chunk_offer_interval);
-                ps->chunk_out = output_create(ps->measure, config);
-                
-                if(ps->bs_addr)
-                {
-                         //Normal peer (not the first)
-                         fprintf(stderr,"Trying to contact the bootstrap node.\n");
-                         srv = create_node(ps->bs_addr, ps->bs_port);
-                       	 if (srv)
-			 {	//the connection to the bootstrap node is successfull
-				topology_node_insert(ps->topology, srv);
-				nodeid_free(srv);
-			 }else	//error to get the address of the peer
-		         {
-                                fprintf(stderr, "Error while connecting to bootstrap mode, exiting.\n");
-                                psinstance_destroy(&ps);
-                         }
-                }
-                else
-                {
-                        // creating the first peer (aka root peer, bootstrap node)
-  		        fprintf(stderr,"Running as bootstrap node.\n");
-                }
+	ps->chunk_time_interval = 0;
+	ps->chunk_offer_interval = 1000000/25;  // microseconds divided by frame (chunks) per second
+	bs_port = config_parse(ps, config, &bs_addr);
+	res = node_init(ps, config);
+	if (res == 0)
+	{
+		ps->measure = measures_create(nodeid_static_str(ps->my_sock));
+		ps->trader = chunk_trader_create(ps, config);
+		ps->topology = topology_create(ps, config);
+		streaming_timers_init(&(ps->timers), ps->chunk_offer_interval);
 
-                if(ps)                
-                        ps->input = input_open((ps->inc).filename, 
-                                        (ps->inc).fds, (ps->inc).fds_size, config);
-        }
-        else
-        {
-                psinstance_destroy(&ps);
-        }
+		if (bs_port > 0 && bs_addr)
+		{
+			bs = create_node(bs_addr, bs_port); // bootstrap node
+			if (bs)
+			{
+				topology_node_insert(ps->topology, bs);
+				nodeid_free(bs);
+			} else
+				fprintf(stderr, "[ERROR] Could not join node %s:%d", bs_addr, bs_port);
+		}
+		ps->inc.fds[0] = -1;
+		ps->input = input_open((ps->inc).filename, (ps->inc).fds, (ps->inc).fds_size, config);
+		(ps->inc).fds[(ps->inc).fds_size] = -1;
+		ps->chunk_out = output_create(ps->measure, config);
+	}
+	else
+		psinstance_destroy(&ps);
 
+	if (bs_addr)
+		free(bs_addr);
 	return ps;
 }
 
@@ -178,9 +167,7 @@ void psinstance_destroy(struct psinstance ** ps)
 			net_helper_deinit((*ps)->my_sock);
 		if ((*ps)->input)
 			input_close((*ps)->input);
-                if ((*ps)->bs_addr)
-                        free((*ps)->bs_addr);
-                free(*ps);
+		free(*ps);
 		*ps = NULL;
 	}
 }
@@ -296,6 +283,11 @@ int8_t psinstance_handle_msg(struct psinstance * ps)
 	return res;
 }
 
+int8_t psinstance_has_input(const struct psinstance *ps)
+{
+	return ps->input ? 1 : 0;
+}
+
 int psinstance_poll(struct psinstance *ps, suseconds_t delta)
 {
 	enum streaming_action required_action;
@@ -303,13 +295,13 @@ int psinstance_poll(struct psinstance *ps, suseconds_t delta)
 
 	if (ps)
 	{
-		streaming_timers_set_timeout(&ps->timers, delta, ps->inc.fds[0] == -1);
+		streaming_timers_set_timeout(&ps->timers, delta, psinstance_has_input(ps) && ps->inc.fds[0] == -1);
 		dtprintf("[DEBUG] timer: %lu %lu\n", ps->timers.sleep_timer.tv_sec, ps->timers.sleep_timer.tv_usec); 
 		data_state = wait4data(ps->my_sock, &(ps->timers.sleep_timer), ps->inc.fds);
 
-		required_action = streaming_timers_state_handler(&ps->timers, data_state);
+		required_action = streaming_timers_state_handler(&ps->timers, data_state, psinstance_has_input(ps));
 		
-                switch (required_action) {
+		switch (required_action) {
 			case OFFER_ACTION:
 				dtprintf("Offer time!\n");
 				psinstance_send_offer(ps);

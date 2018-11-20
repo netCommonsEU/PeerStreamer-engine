@@ -119,7 +119,7 @@ struct chunk_output * output_create(struct measures * ms, const char *config)
 {
 	struct chunk_output * chout = NULL;
 	struct tag * tags;
-	int i, len;
+	int len;
 
 	chout = malloc(sizeof(struct chunk_output));
 	chout->measure = ms;

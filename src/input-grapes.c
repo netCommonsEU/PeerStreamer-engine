@@ -45,52 +45,45 @@ struct input_desc {
 
 struct input_desc *input_open(const char *fname, int *fds, int fds_size, const char * config)
 {
-  struct input_desc *res;
+  struct input_desc *res = NULL;
   struct timeval tv;
-  char *c;
 
   res = malloc(sizeof(struct input_desc));
-  if (res == NULL) {
-    return NULL;
-  }
   memset(res, 0, sizeof(struct input_desc));
 
-  c = strchr(fname,',');   // this is actually ignored
-  if (c) {
-    *(c++) = 0;
-  }
   res->s = input_stream_open(fname, &res->interframe, config);
-  if (res->s == NULL) {
-    free(res);
-    res = NULL;
-    return res;
-  }
-  if (res->interframe == 0) {
-    const int *my_fds;
-    int i = 0;
+  if (res->s)
+  {
+	  if (res->interframe == 0) {
+		const int *my_fds;
+		int i = 0;
 
-    my_fds = input_get_fds(res->s);
-    while(my_fds[i] != -1) {
-      fds[i] = my_fds[i];
-      i = i + 1;
-    }
-    fds[i] = -1;
+		my_fds = input_get_fds(res->s);
+		while(my_fds[i] != -1) {
+		  fds[i] = my_fds[i];
+		  i = i + 1;
+		}
+		fds[i] = -1;
+	  } else {
+		if (fds_size >= 1) {
+		  fds[0] = -1; //This input module needs no fds to monitor
+		}
+		gettimeofday(&tv, NULL);
+		res->start_time = tv.tv_usec + tv.tv_sec * 1000000ULL;
+		res->first_ts = 0;
+		res->id = 0; //(res->start_time / res->interframe) % INT_MAX; //TODO: verify 32/64 bit
+
+		if(INITIAL_ID == -1) {
+		  res->id = (res->start_time / res->interframe) % INT_MAX; //TODO: verify 32/64 bit
+		} else {
+		  res->id = INITIAL_ID;
+		}
+
+		fprintf(stderr,"Initial Chunk Id %d\n", res->id);
+	  }
   } else {
-    if (fds_size >= 1) {
-      fds[0] = -1; //This input module needs no fds to monitor
-    }
-    gettimeofday(&tv, NULL);
-    res->start_time = tv.tv_usec + tv.tv_sec * 1000000ULL;
-    res->first_ts = 0;
-    res->id = 0; //(res->start_time / res->interframe) % INT_MAX; //TODO: verify 32/64 bit
-
-    if(INITIAL_ID == -1) {
-      res->id = (res->start_time / res->interframe) % INT_MAX; //TODO: verify 32/64 bit
-    } else {
-      res->id = INITIAL_ID;
-    }
-
-    fprintf(stderr,"Initial Chunk Id %d\n", res->id);
+	  free(res);
+	  res = NULL;
   }
 
   return res;

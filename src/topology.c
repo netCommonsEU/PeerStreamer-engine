@@ -418,7 +418,7 @@ void peerset_reference_copy_add(struct peerset * dst, struct peerset * src)
 		peerset_push_peer(dst, (struct peer *)p);
 }
 
-void topology_signal_change(struct topology *t, const struct peerset const * old_neighs)
+void topology_signal_change(struct topology *t, const struct peerset * old_neighs)
 {
 	const struct peer * p;
 	int i;

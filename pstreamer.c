@@ -28,8 +28,6 @@
 #include<net_helper.h>
 #include<sys/time.h>
 
-int srv_port = 7000;
-char * srv_ip = "127.0.0.1";
 int running = 1;
 int8_t config_override = 0;
 char * config;
@@ -49,14 +47,13 @@ void show_help()
 
 	fprintf(stdout, "Configuration CSV string fields:\n");
 	
-        
-        fprintf(stdout, "\tiface=<string>:\t\t\tnetwork interface to be used (e.g., \"lo\")\n");
+    fprintf(stdout, "\tiface=<string>:\t\t\tnetwork interface to be used (e.g., \"lo\")\n");
 	fprintf(stdout, "\tport=<int>:\t\t\tlocal port number to be used (default=6000)\n");
 
-	fprintf(stdout, "\tbs_addr=<str>:\t\t\taddress of the root node (if any, otherwise we are the root node)\n");
-	fprintf(stdout, "\tbs_port=<int>:\t\t\t port of the root node (if any, default=6000)\n");
+	fprintf(stdout, "\tbs_addr=<str>:\t\t\taddress of a bootstrap node\n");
+	fprintf(stdout, "\tbs_port=<int>:\t\t\tport of a bootstrap node (if any, default=6000)\n");
 
-	fprintf(stdout, "\tflow_id=<int>:\t\tflow_id of this peer (default=random)\n");
+	fprintf(stdout, "\tflow_id=<int>:\t\t\tflow_id of this peer (default=random)\n");
 	fprintf(stdout, "\toutbuff_size=<int>:\t\tsize in chunks for the output buffer (default=75)\n");
 	fprintf(stdout, "\tchunkbuffer_size=<int>:\t\tsize in chunks for the trading buffer (default=50)\n");
 	fprintf(stdout, "\tsource_multiplicity=<int>:\tnumber of chunks the source pushes in seeding (default=3)\n");
@@ -67,7 +64,7 @@ void show_help()
 	fprintf(stdout, "\tpeer_timeout=<int>:\t\ttimeout in seconds after which a peer is considered dead (default=10)\n");
         
 	fprintf(stdout, "\tpeers_per_offer=<int>:\t\tnumber of peers to offer chunks to (default=1)\n");
-	fprintf(stdout, "\tchunks_per_peer_offer=<int>:\t\tmax number of chunks to be sent to a peer (default=1)\n");
+	fprintf(stdout, "\tchunks_per_peer_offer=<int>:\tmax number of chunks to be sent to a peer (default=1)\n");
 	fprintf(stdout, "\tpeer_timeout=<int>:\t\ttimeout in seconds after which a peer is considered dead (default=10)\n");
 	fprintf(stdout, "\tdist_type=random|turbo:\t\tP2P distribution policy (default=random)\n");
 }
@@ -95,15 +92,18 @@ void cmdline_parse(int argc, char *argv[])
 
 int main(int argc, char **argv)
 {
-	struct psinstance * ps;
+	struct psinstance * ps = NULL;
 
 	(void) signal(SIGTERM, leave);
 	(void) signal(SIGINT, leave);
 	cmdline_parse(argc, argv);
 
-	ps = psinstance_create(config);
-	while (ps && running)
-		psinstance_poll(ps, 5000000);
+	if (running)
+	{
+		ps = psinstance_create(config);
+		while (ps && running)
+			psinstance_poll(ps, 5000000);
+	}
 
 	if (config_override)
 		free(config);

@@ -44,7 +44,6 @@ struct chunk_trader * chunk_trader_create(const struct psinstance *ps,const  cha
 {
 	struct chunk_trader *ct;
 	struct tag * tags;
-	char conf[80];
 
 	ct = malloc(sizeof(struct chunk_trader));
 	ct->dist_type = DIST_UNIFORM;
@@ -307,8 +306,8 @@ int8_t chunk_trader_send_offer(struct chunk_trader *ct)
 {
 	struct peerset *pset;
 	struct peer ** neighs;
-        int n_neighs, n_chunks=0, j;
-	size_t n_pairs, i;
+    int n_neighs, n_chunks=0, j;
+	size_t i, n_pairs;
 	struct PeerChunk * pairs;
 	struct chunkID_multiSet * offer_cset;
 	schedChunkID * ch_buff;
@@ -346,18 +345,18 @@ int8_t chunk_trader_send_offer(struct chunk_trader *ct)
 		}
 	}
 	free(pairs);
-        for(i=0; i<n_chunks; i++)
-	        free(ch_buff[i]);
-        free(ch_buff);
+    for(i=0; i<(size_t)n_chunks; i++)
+	    free(ch_buff[i]);
+    free(ch_buff);
 	return res;
 }
 
 /* Latest-useful chunk selection */
 int8_t chunk_trader_handle_offer(struct chunk_trader *ct, struct peer *p, struct chunkID_multiSet *cset, int max_deliver, uint16_t trans_id)
 {
-	int  min, max, cid, i, nflows, *flows, flow, f, n, min_cb, *ids;
-        struct chunkID_multiSet * acc_set;
-        struct chunk_buffer * cb;
+	int  min, max, cid, i, nflows, *flows, flow, f, n, *ids;
+    struct chunkID_multiSet * acc_set;
+    struct chunk_buffer * cb;
 	struct chunk * chunks;
 	
         //Create with some size !=0 : size couldn't be greater than cset_off size,
@@ -595,8 +594,6 @@ struct chunk_buffer * get_chunkbuffer(struct chunk_trader * ct, int flowid)
 //  Returns a a chunk from all buffers for the given cid
 struct chunk const * get_chunk_multiple(struct chunk_trader * ct, schedChunkID cid)
 {
-  int i, num_chunks;
-  struct chunk const * chunk;
   struct chunk_buffer * cb = get_chunkbuffer(ct, cid->flow_id);
   if(cb) 
      return cb_get_chunk(cb, cid->chunk_id);

@@ -41,8 +41,6 @@ void output_create_test()
 	m = measures_create("dump");
 
 	co = output_create(NULL, NULL);
-	assert(co);
-	output_destroy(&co);
 	assert(co == NULL);
 
 	co = output_create(NULL, "dechunkiser=dummy");

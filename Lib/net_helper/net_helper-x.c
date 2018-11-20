@@ -90,7 +90,7 @@ void net_helper_periodic(struct nodeID *s, struct timeval * interval)
 int wait4data(const struct nodeID *s, struct timeval *tout, int *user_fds)
 /* returns 0 if timeout expires 
  * returns -1 in case of error of the select function
- * retruns 1 if the nodeID file descriptor is ready to be read
+ * returns 1 if the nodeID file descriptor is ready to be read
  * 					(i.e., some data is ready from the network socket)
  * returns 2 if some of the user_fds file descriptors is ready
  */
