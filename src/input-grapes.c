@@ -1,6 +1,7 @@
 /*
  * Copyright (c) 2010-2011 Luca Abeni
  * Copyright (c) 2010-2011 Csaba Kiraly
+ * Copyright (c) 2017-2018 Luca Baldesi
  *
  * This file is part of PeerStreamer.
  *
@@ -20,10 +21,12 @@
  */
 #include <sys/time.h>
 #include <stdlib.h>
+#include <time.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 #include <limits.h>
+#include<grapes_config.h>
 
 #include <chunk.h>
 #include <chunkiser.h>
@@ -41,15 +44,27 @@ struct input_desc {
   int interframe;
   uint64_t start_time;
   uint64_t first_ts;
+  flowid_t flow_id;
 };
 
 struct input_desc *input_open(const char *fname, int *fds, int fds_size, const char * config)
 {
   struct input_desc *res = NULL;
   struct timeval tv;
+  struct tag * tags;
+  int id;
 
   res = malloc(sizeof(struct input_desc));
   memset(res, 0, sizeof(struct input_desc));
+  tags = grapes_config_parse(config);
+  grapes_config_value_int_default(tags, "flow_id", &id, 0);
+  res->flow_id = (flowid_t) id;
+  free(tags);
+  if (!(res->flow_id))
+  {
+	  srand(time(NULL));
+	  res->flow_id = (flowid_t) rand();
+  }
 
   res->s = input_stream_open(fname, &res->interframe, config);
   if (res->s)

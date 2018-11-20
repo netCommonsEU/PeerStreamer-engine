@@ -25,8 +25,7 @@
 #include <stdint.h>
 #include <psinstance_internal.h>
 #include <measures.h>
-
-#define MSG_TYPE_NEIGHBOURHOOD   0x22
+#include <grapes_msg_types.h>
 
 struct topology;
 

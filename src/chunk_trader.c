@@ -177,18 +177,19 @@ int8_t chunk_trader_push_chunk(struct chunk_trader *ct, struct chunk *c, int mul
 	struct peer **peers;
 	struct PeerChunk * pairs;
 	size_t pairs_len;
-        struct sched_chunkID *cid = malloc(sizeof(struct sched_chunkID));
+    struct sched_chunkID *cid = NULL;
 
 	if (ct && c && multiplicity > 0)
-	{
+	{ 
+		cid = malloc(sizeof(struct sched_chunkID));
 		pset = topology_get_neighbours(psinstance_topology(ct->ps));
 		peer_num = peerset_size(pset);
 		peers = peerset_get_peers(pset);
 		
 		pairs_len = MIN(multiplicity, peer_num);
 		pairs = malloc(pairs_len * sizeof(struct PeerChunk));
-	        cid->chunk_id = c->id;
-                cid->flow_id  = c->flow_id; 
+	    cid->chunk_id = c->id;
+        cid->flow_id  = c->flow_id; 
 		if (ct->dist_type == DIST_TURBO)
 			schedSelectChunkFirst(SCHED_WEIGHTED, peers, peer_num, &cid, 1, pairs, &pairs_len, NULL, peer_evaluation_turbo, chunk_evaluation_latest);
 		else
@@ -196,8 +197,8 @@ int8_t chunk_trader_push_chunk(struct chunk_trader *ct, struct chunk *c, int mul
 
 		peer_chunk_send(ct, pairs, pairs_len, INVALID_TRANSID);
 		free(pairs);
-        }
         free(cid);
+	}
 	return res;
 }
 

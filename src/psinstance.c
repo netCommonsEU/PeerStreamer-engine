@@ -244,39 +244,38 @@ int8_t psinstance_handle_msg(struct psinstance * ps)
 		res = -1;
 	}
 	if (len > 0)
-		switch (buff[0] /* Message Type */) {
+	{
+		res = buff[0];  // message type
+		switch (res) {
 			case MSG_TYPE_TMAN:
 			case MSG_TYPE_NEIGHBOURHOOD:
 			case MSG_TYPE_TOPOLOGY:
 				dtprintf("Topo message received:\n");
 				topology_message_parse(ps->topology, remote, buff, len);
-				res = 1;
 				break;
 			case MSG_TYPE_CHUNK:
 				dtprintf("Chunk message received:\n");
-				c = chunk_trader_parse_chunk(ps->trader, remote,
-                                                             buff, len);
-                                if (c)
-                                {
-                                        if (!chunk_trader_add_chunk(ps->trader, c))
-                                        {
-                                                reg_chunk_receive(ps->measure, c);
-                                                output_deliver(ps->chunk_out, c);
-                                                free(c);
-                                        } else
-                                                chunk_destroy(&c);
-                                }
-				res = 2;
+				c = chunk_trader_parse_chunk(ps->trader, remote, buff, len);
+				if (c)
+				{
+					if (!chunk_trader_add_chunk(ps->trader, c))
+					{
+						reg_chunk_receive(ps->measure, c);
+						output_deliver(ps->chunk_out, c);
+						free(c);
+					} else
+						chunk_destroy(&c);
+				}
 				break;
 			case MSG_TYPE_SIGNALLING:
 				dtprintf("Sign message received:\n");
 				chunk_trader_msg_parse(ps->trader, remote, buff, len);
-				res = 3;
 				break;
 			default:
 				fprintf(stderr, "Unknown Message Type %x\n", buff[0]);
-				res = -2;
+				res = -1;
 		}
+	}
 
 	if (remote)
 		nodeid_free(remote);

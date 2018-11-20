@@ -142,15 +142,6 @@ struct topology * topology_create(const struct psinstance *ps, const char *confi
 	return t;
 }
 
-/*useful during bootstrap*/
-int topology_node_insert(struct topology * t, struct nodeID *id)
-{
-	struct metadata m = {0};
-	if (topology_get_peer(t, id) == NULL)
-		peerset_add_peer(t->swarm_bucket,id);
-	return psample_add_peer(t->tc,id,&m,sizeof(m));
-}
-
 
 struct peer * neighbourhood_add_peer(struct topology * t, const struct nodeID *id)
 {
@@ -170,6 +161,13 @@ struct peer * neighbourhood_add_peer(struct topology * t, const struct nodeID *i
 		chunk_trader_send_bmap(psinstance_trader(t->ps), id);
 	}
 	return p;
+}
+
+/*useful during bootstrap*/
+int topology_node_insert(struct topology * t, struct nodeID *id)
+{
+	nodeid_to_peer(t, id, 1);
+	return 0;
 }
 
 void neighbourhood_remove_peer(struct topology * t, const struct nodeID *id)
@@ -360,10 +358,12 @@ struct peerset * peerset_create_reference_copy(struct peerset * pset)
 struct peer *nodeid_to_peer(struct topology * t, struct nodeID *id,int reg)
 {
 	struct peer * p;
+	struct metadata m = {0};
+
 	p = topology_get_peer(t, id);
 	if(p==NULL && reg)
 	{
-		topology_node_insert(t, id);
+		psample_add_peer(t->tc, id, &m, sizeof(m));
 		neighbourhood_add_peer(t, id);
 		p = topology_get_peer(t, id);
 		if(t->topo_out)

@@ -285,9 +285,5 @@ int output_deliver(struct chunk_output* cout, const struct chunk *c)
                         chunk_write(cout->out, c);
                 }
         }
-        else
-        {
-                dprintf("Error delivering chunk: NULL buffer or output\n");
-        }
 	return res;
 }
