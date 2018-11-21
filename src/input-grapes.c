@@ -61,10 +61,7 @@ struct input_desc *input_open(const char *fname, int *fds, int fds_size, const c
   res->flow_id = (flowid_t) id;
   free(tags);
   if (!(res->flow_id))
-  {
-	  srand(time(NULL));
 	  res->flow_id = (flowid_t) rand();
-  }
 
   res->s = input_stream_open(fname, &res->interframe, config);
   if (res->s)
@@ -174,5 +171,6 @@ struct chunk *input_chunk(struct input_desc * s, suseconds_t *delta)
   }
   dprintf("Generated chunk %d of %d bytes\n",c->id, c->size);
   chunk_attributes_init(c);
+  c->flow_id = s->flow_id;
   return c;
 }

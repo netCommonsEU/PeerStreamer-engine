@@ -27,6 +27,7 @@
 #include<string.h>
 #include<net_helper.h>
 #include<sys/time.h>
+#include<time.h>
 
 int running = 1;
 int8_t config_override = 0;
@@ -100,6 +101,7 @@ int main(int argc, char **argv)
 
 	if (running)
 	{
+		srand(time(NULL));   // init seed for random genetator (used for flow_id numbers)
 		ps = psinstance_create(config);
 		while (ps && running)
 			psinstance_poll(ps, 5000000);

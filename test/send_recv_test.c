@@ -20,21 +20,14 @@ void chunkiser_send_recv_test()
 
 	psinstance_network_periodic(ps2);  
 	res = psinstance_handle_msg(ps1);
-	assert(res == MSG_TYPE_TOPOLOGY);		// join swarm message
-	res = psinstance_handle_msg(ps1);
-	assert(res == MSG_TYPE_SIGNALLING);		// chunk list offer
-	res = psinstance_handle_msg(ps1);
 	assert(res == MSG_TYPE_NEIGHBOURHOOD);	// neighbourhood adding message
 
 	psinstance_network_periodic(ps1);
-	res = psinstance_handle_msg(ps2);
-	assert(res == MSG_TYPE_TOPOLOGY);		// swarm control message
 	res = psinstance_handle_msg(ps2);
 	assert(res == MSG_TYPE_SIGNALLING);		// chunk list offer
 
 	psinstance_inject_chunk(ps1);
 	psinstance_network_periodic(ps1);		// send chunk
-
 
 	res = psinstance_handle_msg(ps2);
 	assert(res == MSG_TYPE_CHUNK);			// received injected chunk
@@ -60,15 +53,9 @@ void join_test()
 
 	psinstance_network_periodic(ps2);  
 	res = psinstance_handle_msg(ps1);
-	assert(res == MSG_TYPE_TOPOLOGY);		// join swarm message
-	res = psinstance_handle_msg(ps1);
-	assert(res == MSG_TYPE_SIGNALLING);		// chunk list offer
-	res = psinstance_handle_msg(ps1);
 	assert(res == MSG_TYPE_NEIGHBOURHOOD);	// neighbourhood adding message
 
 	psinstance_network_periodic(ps1);
-	res = psinstance_handle_msg(ps2);
-	assert(res == MSG_TYPE_TOPOLOGY);		// swarm control message
 	res = psinstance_handle_msg(ps2);
 	assert(res == MSG_TYPE_SIGNALLING);		// chunk list offer
 
