@@ -51,13 +51,14 @@ struct psinstance {
 	suseconds_t chunk_offer_interval; // microseconds
 	int source_multiplicity;
 	enum L3PROTOCOL l3;
+	flowid_t peer_id;
 };
 
 int config_parse(struct psinstance * ps, const char * config, char **bs_addr)
 {
 	struct tag * tags;
 	const char *tmp_str;
-	int bs_port;
+	int bs_port, id;
 
 	tags = grapes_config_parse(config);
 
@@ -74,6 +75,11 @@ int config_parse(struct psinstance * ps, const char * config, char **bs_addr)
 	strcpy((ps->inc).filename, tmp_str ? tmp_str : "");
 	tmp_str = grapes_config_value_str_default(tags, "AF", NULL);
 	ps->l3 = tmp_str && (strcmp(tmp_str, "INET6") == 0) ? IP6 : IP4;
+
+	grapes_config_value_int_default(tags, "flow_id", &id, 0);
+	if (!id)
+		id = rand();
+	ps->peer_id = (flowid_t) id;
 
 	free(tags);
 	return bs_port;
@@ -196,6 +202,11 @@ struct chunk_output * psinstance_output(const struct psinstance * ps)
 const struct chunk_trader * psinstance_trader(const struct psinstance * ps)
 {
 	return ps->trader;
+}
+
+flowid_t psinstance_identifier(const struct psinstance * ps)
+{
+	return ps->peer_id;
 }
 
 int8_t psinstance_send_offer(struct psinstance * ps)

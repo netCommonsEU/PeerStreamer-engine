@@ -23,6 +23,7 @@
 
 #include<stdint.h>
 #include<net_helper.h>
+#include<chunk.h>
 
 struct psinstance;
 
@@ -35,6 +36,8 @@ struct measures * psinstance_measures(const struct psinstance * ps);
 struct chunk_output * psinstance_output(const struct psinstance * ps);
 
 const struct chunk_trader * psinstance_trader(const struct psinstance * ps);
+
+flowid_t psinstance_identifier(const struct psinstance * ps);
 
 
 #endif
