@@ -56,7 +56,6 @@ void show_help()
 
 	fprintf(stdout, "\tflow_id=<int>:\t\t\tflow_id of this peer (default=random)\n");
 	fprintf(stdout, "\toutbuff_size=<int>:\t\tsize in chunks for the output buffer (default=75)\n");
-	fprintf(stdout, "\tchunkbuffer_size=<int>:\t\tsize in chunks for the trading buffer (default=50)\n");
 	fprintf(stdout, "\tsource_multiplicity=<int>:\tnumber of chunks the source pushes in seeding (default=3)\n");
 	fprintf(stdout, "\tfilename=<string>:\t\tfilename of a media content to be streamed (source side only)\n");
 	fprintf(stdout, "\tAF=INET|INET6:\t\t\taddress family, IPv4 or IPv6 (default=INET)\n");

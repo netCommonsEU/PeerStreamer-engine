@@ -57,7 +57,7 @@ uint64_t gettimeofday_in_us(void)
 	return what_time.tv_sec * 1000000ULL + what_time.tv_usec;
 }
 
-void log_signal(const struct nodeID *fromid,const struct nodeID *toid,uint16_t trans_id, enum signaling_typeMS type,const char *flag, const struct chunkID_multiSet *ms)
+void log_signal(const struct nodeID *fromid, const struct nodeID *toid, const int cidset_size, uint16_t trans_id, enum signaling_typeMS type, const char *flag)
 {
 	char typestr[24];
 	char sndr[NODE_STR_LENGTH],rcvr[NODE_STR_LENGTH];
@@ -92,13 +92,6 @@ void log_signal(const struct nodeID *fromid,const struct nodeID *toid,uint16_t t
 
 	}
 	fprintf(stderr,"[SIGNAL_LOG],%"PRIu64",%s,%s,%d,%s,%s\n",gettimeofday_in_us(),sndr,rcvr,trans_id,typestr,flag);
-        if(ms)
-        {
-                fprintf(stderr,"\t---->%d sets, %d chunks\n",chunkID_multiSet_size(ms), chunkID_multiSet_total_size(ms));
-#ifdef LOG_CHUNK
-                chunkID_multiSet_print(stderr, ms);
-#endif
-        }
 }
 
 void log_chunk(const struct nodeID *from,const struct nodeID *to,const struct chunk *c,const char * note)

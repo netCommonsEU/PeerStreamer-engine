@@ -1,4 +1,5 @@
 SRC=$(wildcard *.c)
+SRC+=$(wildcard rbtree/*.c)
 OBJS=$(SRC:.c=.o)
 
 GRAPES ?= ../../grapes
@@ -14,7 +15,7 @@ $(TARGET): $(OBJS) $(SRC)
 	$(AR) $(ARFLAGS) $(TARGET) $(OBJS) 
 
 clean:
-	rm -f *.o $(TARGET)
+	rm -f rbtree/*.o *.o $(TARGET)
 
 .PHONY: clean
 

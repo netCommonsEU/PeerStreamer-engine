@@ -42,7 +42,7 @@ int ftprintf(FILE *stream, const char *format, ...);
 #endif
 
 
-void log_signal(const struct nodeID *fromid,const struct nodeID *toid,uint16_t trans_id, enum signaling_typeMS type,const char *flag, const struct chunkID_multiSet *ms);
+void log_signal(const struct nodeID *fromid,const struct nodeID *toid,const int cidset_size,uint16_t trans_id,enum signaling_typeMS type,const char *flag);
 
 void log_chunk(const struct nodeID *from,const struct nodeID *to,const struct chunk *c,const char * note);
 

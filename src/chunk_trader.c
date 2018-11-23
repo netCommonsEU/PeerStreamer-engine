@@ -3,17 +3,17 @@
 #include<measures.h>
 #include<grapes_config.h>
 #include<string.h>
-#include<chunkbuffer.h>
+#include<dyn_chunk_buffer.h>
 #include<chunklock.h>
 #include<scheduler_common.h>
 #include<peer_metadata.h>
 #include<peerset.h>
 #include<scheduler_la.h>
 #include<transaction.h>
-#include<chunkidms.h>
 #include<chunkidms_trade.h>
-#include<chunk_attributes.h>
+#include<chunkidms.h>
 #include<trade_msg_ha.h>
+#include<chunk_attributes.h>
 
 #include<net_helpers.h>
 
@@ -22,12 +22,9 @@
 enum distribution_type {DIST_UNIFORM, DIST_TURBO};
 
 struct chunk_trader{
-	struct chunk_buffer **cbs;
-        int flows_number;
+	struct dyn_chunk_buffer *cb;
 	struct chunk_locks * ch_locks;
 	const struct psinstance * ps;
-	int cb_size;
-        int my_flowid;
 	enum distribution_type dist_type;
 	int offer_per_period;
 	struct service_times_element * transactions;
@@ -37,7 +34,7 @@ struct chunk_trader{
 
 int chunk_trader_buffer_size(const struct chunk_trader *ct)
 {
-	return ct->cb_size;
+	return (int)dyn_chunk_buffer_length(ct->cb);
 }
 
 struct chunk_trader * chunk_trader_create(const struct psinstance *ps,const  char *config)
@@ -56,64 +53,39 @@ struct chunk_trader * chunk_trader_create(const struct psinstance *ps,const  cha
 	grapes_config_value_int_default(tags, "offer_per_period", &(ct->offer_per_period), 1);
 	grapes_config_value_int_default(tags, "peers_per_offer", &(ct->peers_per_offer), 1);
 	grapes_config_value_int_default(tags, "chunks_per_peer_offer", &(ct->chunks_per_peer_offer), 1);
-	grapes_config_value_int_default(tags, "chunkbuffer_size", &(ct->cb_size), 50);
-	
-        ct->my_flowid = 1+ (rand()%10000); // Random flow_id from 1 to 9999
-        grapes_config_value_int_default(tags, "flow_id", &(ct->my_flowid),
-                        ct->my_flowid);
+	free(tags);
 
-        
-        free(tags);
-	
-        ct->flows_number = 0;
-        ct->cbs = NULL;
-
-        //Initialize our chunkbuffer so we'll find it in ct->cbs[0] everytime
-	get_chunkbuffer(ct, ct->my_flowid);
-        
-        ct->ch_locks = chunk_locks_create(80);  // milliseconds of lock time
+	ct->cb = dyn_chunk_buffer_create();
+	ct->ch_locks = chunk_locks_create(80);  // milliseconds of lock time
 	return ct;
 }
 
 void chunk_trader_destroy(struct chunk_trader **ct)
 {
-        int i;
-
 	if (ct && *ct)
 	{
 		if(((*ct)->ch_locks))
 			chunk_locks_destroy(&((*ct)->ch_locks));
-        	if(((*ct)->transactions))
+		if(((*ct)->transactions))
 			transaction_destroy(&((*ct)->transactions));
-        	if(((*ct)->cbs))
-                {
-                        for(i=0; i<(*ct)->flows_number; i++)
-                                cb_destroy((*ct)->cbs[i]);
-			
-                        free((*ct)->cbs);
-                }
+		if(((*ct)->cb))
+			dyn_chunk_buffer_destroy(&((*ct)->cb));
 		free(*ct);
 		*ct = NULL;
 	}
 }
 
-
 int8_t chunk_trader_add_chunk(struct chunk_trader *ct, struct chunk *c)
 {
 	int res = -1;
-        struct chunk_buffer * cb = NULL;
+
 	if (ct && c)
 	{
-                cb = get_chunkbuffer(ct, c->flow_id);
-                if(cb)
-                {
-                
-	        	res = cb_add_chunk(cb, c);
-		        if (res)
-			        log_chunk_error(psinstance_nodeid(ct->ps), NULL, c, res);
-		        res = res < 0 ? -1 : 0;
-                }
-        }
+		res = dyn_chunk_buffer_add_chunk(ct->cb, c);
+		if (res)
+			log_chunk_error(psinstance_nodeid(ct->ps), NULL, c, res);
+		res = res < 0 ? -1 : 0;
+	}
 	return res;
 }
 
@@ -122,22 +94,18 @@ int8_t peer_chunk_send(struct chunk_trader * ct, struct PeerChunk *pairs, int pa
 	int i, res =-1;
 	struct peer * target_peer;
 	struct chunk * target_chunk;
-#ifdef LOG_CHUNK
-        
-        cb_print(ct);
-#endif
 
 	for (i=0; i<pairs_len; i++)
 	{
 		target_peer = pairs[i].peer;
-		target_chunk = (struct chunk *) get_chunk_multiple(ct, pairs[i].chunk);
+		target_chunk = (struct chunk *) dyn_chunk_buffer_get_chunk(ct->cb, pairs[i].chunk.chunk_id, pairs[i].chunk.flow_id);
+
 		res = sendChunk(psinstance_nodeid(ct->ps),target_peer->id, target_chunk, transid);	//we use transactions in order to register acks for push
 		if (res >= 0)
 		{
 			chunk_attributes_update_upon_sending(target_chunk);
 			chunkID_multiSet_add_chunk(peer_bmap(target_peer), target_chunk->id, target_chunk->flow_id);
 #ifdef LOG_CHUNK
-
 			log_chunk(psinstance_nodeid(ct->ps), target_peer->id, target_chunk, "SENT");
 #endif
 		} 
@@ -163,9 +131,9 @@ double peer_evaluation_uniform(struct peer **n)
 	return 1.0;
 }
 
-double chunk_evaluation_latest(schedChunkID *cid)
+double chunk_evaluation_latest(struct sched_chunkID *cid)
 {
-	return (*cid)->chunk_id;
+	return cid->timestamp;
 }
 
 /** chunk actions **/
@@ -177,19 +145,20 @@ int8_t chunk_trader_push_chunk(struct chunk_trader *ct, struct chunk *c, int mul
 	struct peer **peers;
 	struct PeerChunk * pairs;
 	size_t pairs_len;
-    struct sched_chunkID *cid = NULL;
+	struct sched_chunkID cid;
 
 	if (ct && c && multiplicity > 0)
-	{ 
-		cid = malloc(sizeof(struct sched_chunkID));
+	{
 		pset = topology_get_neighbours(psinstance_topology(ct->ps));
 		peer_num = peerset_size(pset);
 		peers = peerset_get_peers(pset);
 		
 		pairs_len = MIN(multiplicity, peer_num);
 		pairs = malloc(pairs_len * sizeof(struct PeerChunk));
-	    cid->chunk_id = c->id;
-        cid->flow_id  = c->flow_id; 
+		cid.chunk_id = c->id;
+		cid.flow_id = c->flow_id;
+		cid.timestamp = c->timestamp;
+		
 		if (ct->dist_type == DIST_TURBO)
 			schedSelectChunkFirst(SCHED_WEIGHTED, peers, peer_num, &cid, 1, pairs, &pairs_len, NULL, peer_evaluation_turbo, chunk_evaluation_latest);
 		else
@@ -197,33 +166,20 @@ int8_t chunk_trader_push_chunk(struct chunk_trader *ct, struct chunk *c, int mul
 
 		peer_chunk_send(ct, pairs, pairs_len, INVALID_TRANSID);
 		free(pairs);
-        free(cid);
 	}
 	return res;
 }
 
-int8_t chunk_trader_send_ack(struct chunk_trader *ct, struct nodeID *to, uint16_t transid, int flowid, int chunkid)
+int8_t chunk_trader_send_ack(struct chunk_trader *ct, struct nodeID *to, uint16_t transid)
 {
 	struct chunkID_multiSet * bmap;
-        const struct chunk * c;
-        struct chunk_buffer *cb=get_chunkbuffer(ct, flowid);
-        if(cb)
-        {
-                //Do not send all chunks, only the one to ack
-                c=cb_get_chunk(cb, chunkid);
-                if(c!=NULL)
-                {
-                        bmap=chunkID_multiSet_init(1,1);
-                        chunkID_multiSet_add_chunk(bmap, chunkid, flowid);
-                        sendAckMS(psinstance_nodeid(ct->ps),to, bmap,transid);
+
+	bmap = dyn_chunk_buffer_to_multiset(ct->cb);
+	sendAckMS(psinstance_nodeid(ct->ps), to, bmap, transid);
 #ifdef LOG_SIGNAL
-                        log_signal(psinstance_nodeid(ct->ps),to,transid,sig_ack,"SENT", bmap);
+	log_signal(psinstance_nodeid(ct->ps), to, chunkID_multiSet_total_size(bmap), transid, sig_ack, "SENT");
 #endif
-                        chunkID_multiSet_free(bmap);
-                }
-
-        }
-
+	chunkID_multiSet_free(bmap);
 	return 0;
 }
 
@@ -254,19 +210,18 @@ struct chunk * chunk_trader_parse_chunk(struct chunk_trader *ct, struct nodeID *
 		if (res > 0)
 		{
 			chunk_attributes_update_upon_reception(c);
-			chunk_unlock(ct->ch_locks, c->flow_id, c->id); // in case we locked it in a select message
+			chunk_unlock(ct->ch_locks, c->id, c->flow_id); // in case we locked it in a select message
 #ifdef LOG_CHUNK
-                        log_chunk(from, psinstance_nodeid(ct->ps), c, "RECEIVED");
-                        cb_print(ct);
+			log_chunk(from, psinstance_nodeid(ct->ps), c, "RECEIVED");
 #endif
 			p = nodeid_to_peer(psinstance_topology(ct->ps), from, 0);
 			if (p)
 				chunkID_multiSet_add_chunk(peer_bmap(p), c->id, c->flow_id);  // keep track it has this chunk for sure
-			chunk_trader_send_ack(ct, from, transid, c->flow_id, c->id);
+			chunk_trader_send_ack(ct, from, transid);
 
 		} else {
 #ifdef LOG_CHUNK
-                        log_chunk_error(from, psinstance_nodeid(ct->ps), c, E_CANNOT_PARSE);
+			log_chunk_error(from, psinstance_nodeid(ct->ps), c, E_CANNOT_PARSE);
 #endif
 			chunk_destroy(&c);
 		}
@@ -276,50 +231,46 @@ struct chunk * chunk_trader_parse_chunk(struct chunk_trader *ct, struct nodeID *
 }
 
 /** signalling actions **/
-int peer_needs_chunk_filter(struct peer *p, schedChunkID cid)
+int peer_needs_chunk_filter(struct peer *p, struct sched_chunkID * sc)
 {
 	int min;
 
 	if (peer_cb_size(p) == 0) // it does not have capacity
 		return 0;
-	if (chunkID_multiSet_check(peer_bmap(p),cid->chunk_id, cid->flow_id) < 0)  // not in bmap
+	if (chunkID_multiSet_check(peer_bmap(p), sc->chunk_id, sc->flow_id) < 0)  // not in bmap
 	{
-		if(peer_cb_size(p) > chunkID_multiSet_single_size(peer_bmap(p), cid->flow_id)) // it has room for chunks anyway
+		if(peer_cb_size(p) > chunkID_multiSet_total_size(peer_bmap(p))) // it has room for chunks anyway
 		{
-			min = chunkID_multiSet_get_earliest(peer_bmap(p), cid->flow_id) - peer_cb_size(p) + chunkID_multiSet_single_size(peer_bmap(p), cid->flow_id);
+			min = chunkID_multiSet_get_earliest(peer_bmap(p), sc->flow_id) - peer_cb_size(p) + chunkID_multiSet_total_size(peer_bmap(p));
 			min = min < 0 ? 0 : min;
-			if (cid->chunk_id >= min)
+			if (sc->chunk_id  >= min)
 				return 1;
 		}
-                        if((int)chunkID_multiSet_get_earliest(peer_bmap(p), cid->flow_id) < cid ->chunk_id)  // our is reasonably new
+		if((int)chunkID_multiSet_get_earliest(peer_bmap(p), sc->flow_id) < sc->chunk_id)  // our is reasonably new
 			return 1;
 	}
 	return 0;
 }
 
-
-
-
-
-
-
 int8_t chunk_trader_send_offer(struct chunk_trader *ct)
 {
 	struct peerset *pset;
 	struct peer ** neighs;
-    int n_neighs, n_chunks=0, j;
-	size_t i, n_pairs;
+	int n_neighs, n_chunks, j;
+	size_t n_pairs, i;
 	struct PeerChunk * pairs;
 	struct chunkID_multiSet * offer_cset;
-	schedChunkID * ch_buff;
+	struct sched_chunkID * ch_buff;
 	int8_t res = 0;
 	uint16_t transid;
+	uint32_t len;
 
 	pset = topology_get_neighbours(psinstance_topology(ct->ps));
 	n_neighs = peerset_size(pset);
 	neighs = peerset_get_peers(pset);
-	ch_buff = chunk_buffer_to_idarray(ct, &n_chunks);
-	pairs = malloc(sizeof(struct PeerChunk) * n_chunks);
+	ch_buff = dyn_chunk_buffer_to_idarray(ct->cb, &len);
+	pairs = malloc(sizeof(struct PeerChunk) * len);
+	n_chunks = len;
 
 	for (j=0; j<ct->peers_per_offer; j++)
 	{
@@ -333,135 +284,95 @@ int8_t chunk_trader_send_offer(struct chunk_trader *ct)
 
 		if (n_pairs > 0)
 		{
-			offer_cset = chunkID_multiSet_init(0,0);
+			offer_cset = chunkID_multiSet_init(n_pairs, n_pairs);
 			for(i=0; i<n_pairs; i++)
-				chunkID_multiSet_add_chunk(offer_cset, pairs[i].chunk->chunk_id, pairs[i].chunk->flow_id);
+				chunkID_multiSet_add_chunk(offer_cset, pairs[i].chunk.chunk_id, pairs[i].chunk.flow_id);
 			transid = transaction_create(&(ct->transactions), pairs[0].peer->id);
 			offerChunksMS(psinstance_nodeid(ct->ps), pairs[0].peer->id, offer_cset, ct->chunks_per_peer_offer, transid);
 #ifdef LOG_SIGNAL
-			log_signal(psinstance_nodeid(ct->ps), pairs[0].peer->id, transid, sig_offer, "SENT", offer_cset);
+			log_signal(psinstance_nodeid(ct->ps), pairs[0].peer->id, chunkID_multiSet_total_size(offer_cset), transid, sig_offer, "SENT");
 #endif
 			chunkID_multiSet_free(offer_cset);
 			res++;
 		}
 	}
 	free(pairs);
-    for(i=0; i<(size_t)n_chunks; i++)
-	    free(ch_buff[i]);
-    free(ch_buff);
+	free(ch_buff);
 	return res;
 }
 
 /* Latest-useful chunk selection */
 int8_t chunk_trader_handle_offer(struct chunk_trader *ct, struct peer *p, struct chunkID_multiSet *cset, int max_deliver, uint16_t trans_id)
 {
-	int  min, max, cid, i, nflows, *flows, flow, f, n, *ids;
-    struct chunkID_multiSet * acc_set;
-    struct chunk_buffer * cb;
-	struct chunk * chunks;
-	
-        //Create with some size !=0 : size couldn't be greater than cset_off size,
-        //single_size should be equal between every node
-        
-        acc_set = chunkID_multiSet_init(chunkID_multiSet_size(cset), ct->cb_size);
-        
+	struct chunkID_multiSet * acc_set;
+	struct chunkID_multiSet_iterator * iter;
+	int res = 0, cnt = 0;
+	chunkid_t cid;
+	flowid_t fid;
+
+	acc_set = chunkID_multiSet_init(chunkID_multiSet_size(cset), max_deliver);
+
 	chunkID_multiSet_union(peer_bmap(p), cset);
 	chunkID_multiSet_trimAll(peer_bmap(p), peer_cb_size(p));
 	gettimeofday(peer_bmap_timestamp(p), NULL);
-        flows = chunkID_multiSet_get_flows(cset, &nflows);
-        for(f=0; f<nflows; f++)
-        {
-                flow = flows[f];
-                if(flow != ct->my_flowid)
-                {
-                        /* we use counting sort to sort chunks in O(~|cset|) */
-                        min = chunkID_multiSet_get_earliest(cset, flow);
-                        max = chunkID_multiSet_get_latest(cset, flow);
-                        ids = malloc(sizeof(int)* (max-min+1));
-                        memset(ids, 0, sizeof(int)*(max-min+1));
-                        cb = get_chunkbuffer(ct, flow);
-			chunks = cb_get_chunks(cb, &n);
 
-                        for(i=0; i<chunkID_multiSet_single_size(cset, flow); i++)
-                        {
-                                cid = chunkID_multiSet_get_chunk(cset, i, flow);
-                                ids[cid-min] += 1;
-                        }
-                        /* we select the latest useful */
-                        cid = max;
-                        while(cid>=min && chunkID_multiSet_single_size(acc_set, flow) < max_deliver
-					&& (n<=0 || cid>chunks[0].id))
-                        {
-                                if (ids[cid-min] && !cb_get_chunk(cb, cid) && !chunk_islocked(ct->ch_locks, flow, cid))
-                                {
-                                        chunkID_multiSet_add_chunk(acc_set, cid, flow);
-                                        chunk_lock(ct->ch_locks, flow, cid, p);
-                                }
-                                cid--;
-                        }
-                        free(ids);
-                }
-        }
+	iter = chunkID_multiSet_iterator_create(cset);
+	while (!res && cnt < max_deliver)
+	{
+		res = chunkID_multiSet_iterator_next(iter, &cid, &fid);
+		if (!res && !dyn_chunk_buffer_get_chunk(ct->cb, cid, fid) && !chunk_islocked(ct->ch_locks, cid, fid))
+		{
+			chunkID_multiSet_add_chunk(acc_set, cid, fid);
+			chunk_lock(ct->ch_locks, fid, cid, p);
+			cnt++;
+		}
+	}
+	free(iter);
 
-
-        acceptChunksMS(psinstance_nodeid(ct->ps), p->id, acc_set, trans_id);
+    acceptChunksMS(psinstance_nodeid(ct->ps), p->id, acc_set, trans_id);
 #ifdef LOG_SIGNAL
-	log_signal(psinstance_nodeid(ct->ps), p->id, trans_id, sig_accept, "SENT", acc_set);
+	log_signal(psinstance_nodeid(ct->ps), p->id, chunkID_multiSet_total_size(acc_set), trans_id, sig_accept, "SENT");
 #endif
 
 	chunkID_multiSet_free(acc_set);
-        free(flows);
-
 	return 0;
 }
 
 int8_t chunk_trader_handle_accept(struct chunk_trader *ct, struct peer *p, struct chunkID_multiSet *cset, int max_deliver, uint16_t transid)
 {
-	int i, max_chunks, pairs_len = 0, f, *flows, nflows=0;
+	int res=0, max_chunks, pairs_len = 0;
 	const struct chunk *c;
+	chunkid_t cid;
+	flowid_t fid;
 	struct PeerChunk * pairs;
-        struct chunk_buffer *cb;
-        schedChunkID cid = NULL;
-        flows = chunkID_multiSet_get_flows(cset, &nflows);
-        pairs_len = 0;
-        max_chunks = MIN(ct->chunks_per_peer_offer * nflows, chunkID_multiSet_total_size(cset)); 
-        pairs = malloc(sizeof(struct PeerChunk) * max_chunks);  
-        
-        transaction_reg_accept(ct->transactions, transid, p->id);
-        
-        for(f=0; f<nflows && pairs_len < max_chunks; f++)
-        {
-                for(i=0; i<chunkID_multiSet_single_size(cset, flows[f]) && pairs_len < max_chunks; i++)
-                {
-                        cid = malloc(sizeof(struct sched_chunkID));
-                        cid->flow_id = flows[f];
-                        cid->chunk_id = chunkID_multiSet_get_chunk(cset, i, flows[f]);
-                        cb = get_chunkbuffer(ct, flows[f]);
-                        if(cb)
-                        {
-                                c = cb_get_chunk(cb, cid->chunk_id);
-                                if (c)  // if we still have it in the chunk buffer
-                                {
-                                        pairs[pairs_len].peer = p;
-                                        pairs[pairs_len].chunk = cid;
-                                        pairs_len++;
-                                }
-                        }
+	struct chunkID_multiSet_iterator * iter;
+
+	max_chunks = MIN(chunkID_multiSet_total_size(cset), ct->chunks_per_peer_offer);
+	pairs = malloc(sizeof(struct PeerChunk) * max_chunks);  
+
+	transaction_reg_accept(ct->transactions, transid, p->id);
+
+	iter = chunkID_multiSet_iterator_create(cset);
+	while(!res)
+	{
+		res = chunkID_multiSet_iterator_next(iter, &cid, &fid);
+		c = dyn_chunk_buffer_get_chunk(ct->cb, cid, fid);
+		if (c)  // if we still have it in the chunk buffer
+		{
+			pairs[pairs_len].peer = p;
+			pairs[pairs_len].chunk.chunk_id = cid;
+			pairs[pairs_len].chunk.flow_id = fid;
+			pairs_len++;
+		} 
 #ifdef LOG_CHUNK
-                        else
-                                log_chunk_error(psinstance_nodeid(ct->ps), p->id, c, E_CACHE_MISS);
+		else
+			log_chunk_error(psinstance_nodeid(ct->ps), p->id, c, E_CACHE_MISS);
 #endif
-                }
-        }
-        //Free unused pairs (if any)
-        if(pairs_len < ct->chunks_per_peer_offer * nflows)
-                pairs = realloc(pairs, sizeof(struct PeerChunk) * pairs_len);
+	}
+	free(iter);
 
 	peer_chunk_send(ct, pairs, pairs_len, transid);
-	for(i=0; i<pairs_len; i++)
-                free(pairs[i].chunk);
-        free(pairs);
-        free(flows);
+	free(pairs);
 
 	return 0;
 }
@@ -469,9 +380,8 @@ int8_t chunk_trader_handle_accept(struct chunk_trader *ct, struct peer *p, struc
 int8_t chunk_trader_handle_ack(struct chunk_trader *ct, struct peer *p, struct chunkID_multiSet *cset, uint16_t transid)
 {
 	chunkID_multiSet_union(peer_bmap(p), cset);
-	
 	chunkID_multiSet_trimAll(peer_bmap(p), peer_cb_size(p));
-        gettimeofday(peer_bmap_timestamp(p), NULL);
+	gettimeofday(peer_bmap_timestamp(p), NULL);
 
 	transaction_remove(&(ct->transactions), transid);
 	return 0;
@@ -488,7 +398,7 @@ int8_t chunk_trader_msg_parse(struct chunk_trader *ct, struct nodeID *from, uint
 
 	res = parseSignalingMS(buff+1, buff_len-1, &bmap_owner, &cset, &max_deliver, &trans_id, &sig_type);
 #ifdef LOG_SIGNAL
-    log_signal(from, psinstance_nodeid(ct->ps), trans_id, sig_type, "RECEIVED", cset);
+    log_signal(from, psinstance_nodeid(ct->ps), chunkID_multiSet_total_size(cset), trans_id, sig_type, "RECEIVED");
 #endif
 	if (res >= 0)
 	{
@@ -526,10 +436,10 @@ int8_t chunk_trader_send_bmap(const struct chunk_trader *ct, const struct nodeID
 {
 	struct chunkID_multiSet *bmap;
 
-	bmap = generateChunkIDMultiSetFromChunkBuffers(ct->cbs, ct->flows_number);
-	sendBufferMapMS(psinstance_nodeid(ct->ps), to, psinstance_nodeid(ct->ps), bmap, ct->cb_size, INVALID_TRANSID);
+	bmap = dyn_chunk_buffer_to_multiset(ct->cb);
+	sendBufferMapMS(psinstance_nodeid(ct->ps), to, psinstance_nodeid(ct->ps), bmap, chunk_trader_buffer_size(ct), INVALID_TRANSID);
 #ifdef LOG_SIGNAL
-	log_signal(psinstance_nodeid(ct->ps), to, INVALID_TRANSID, sig_send_buffermap,"SENT", bmap);
+	log_signal(psinstance_nodeid(ct->ps), to, chunkID_multiSet_total_size(bmap), INVALID_TRANSID, sig_send_buffermap,"SENT");
 #endif
 	chunkID_multiSet_free(bmap);
 	return 0;
@@ -547,7 +457,7 @@ suseconds_t chunk_trader_offer_interval(const struct chunk_trader *ct)
 
 	offer_int = chunk_interval_measure(psinstance_measures(ct->ps));
 	ms_int = offer_int;
-	ms_int *= 0.5;  // we try to relax it a bit 
+	ms_int *= 0.75;  // we try to relax it a bit 
 	
 	if (ct->dist_type == DIST_TURBO) {
 		pset = topology_get_neighbours(psinstance_topology(ct->ps));
@@ -555,118 +465,6 @@ suseconds_t chunk_trader_offer_interval(const struct chunk_trader *ct)
 			load += peer_evaluation_turbo((struct peer **)&p);
 		ms_int /= load;
 	} 
-        dprintf("Chunk interval estimate is %li, so offer interval is %li \n", offer_int, (suseconds_t)(ms_int / ct->offer_per_period));
+
 	return (suseconds_t)(ms_int / ct->offer_per_period);
 }
-
-
-// Retrieves the correct chunkbuffer. If not found, creates it
-struct chunk_buffer * get_chunkbuffer(struct chunk_trader * ct, int flowid)
-{
-        int i;
-
-        if(ct->flows_number>0)
-                for(i = 0; i < ct->flows_number; i++)
-                        if(cb_get_flowid(ct->cbs[i]) == flowid)
-                                return ct->cbs[i];
-
-  // We didn't find the buffer -> it's a new flow!
-  
-        struct chunk_buffer **new_buffers=NULL;
-        char conf[80];
-        sprintf(conf, "size=%d", ct->cb_size);
-
-        new_buffers = realloc(ct->cbs, sizeof(struct chunk_buffer *) * (ct->flows_number+1)); 
-        if(!new_buffers)
-        {
-                dprintf("There are been some problems allocating new buffer!\n");
-                return NULL;
-        }
-
-        ct->cbs=new_buffers;
-        ct->cbs[ct->flows_number]=cb_init(conf);
-        cb_set_flowid(ct->cbs[ct->flows_number] , flowid);
-
-        ct->flows_number+=1;
-        return ct->cbs[ct->flows_number-1];
-}
-
-
-//  Returns a a chunk from all buffers for the given cid
-struct chunk const * get_chunk_multiple(struct chunk_trader * ct, schedChunkID cid)
-{
-  struct chunk_buffer * cb = get_chunkbuffer(ct, cid->flow_id);
-  if(cb) 
-     return cb_get_chunk(cb, cid->chunk_id);
-  
-  return NULL;
-}
-
-
-struct chunk ** get_chunks_multiple(const struct chunk_trader * ct, int ** num_chunks, int * total)
-{
-  int i;
-  struct chunk ** chunks = malloc(sizeof(struct  chunk *) * ct->flows_number);
-  *num_chunks = malloc(sizeof(int) * ct->flows_number);
-  *total = 0;
-
-  for(i=0; i<ct->flows_number; i++)
-  {
-    chunks[i]= cb_get_chunks(ct->cbs[i], &((*num_chunks)[i]) );
-    *total += (*num_chunks)[i];
-  }
-  return chunks;
-}
- 
-schedChunkID * chunk_buffer_to_idarray(struct chunk_trader * ct, int * size)
-{
-
-        int *num_chunks, i, f, j;
-        schedChunkID *cids;
-        struct chunk **chunks = get_chunks_multiple(ct, &num_chunks, size);
-        cids = malloc(sizeof(schedChunkID) * *size);
-        for(f=0, i=0; f<ct->flows_number; f++)
-        {
-                for(j=0; j< num_chunks[f]; j++)
-                {
-                        cids[*size - 1 - i] = malloc(sizeof(struct sched_chunkID));
-                        cids[*size - 1 - i]->chunk_id = (chunks[f][j]).id;
-                        cids[*size - 1 - i]->flow_id = cb_get_flowid(ct->cbs[f]);
-                        i++;
-                }
-        }
-        
-        free(chunks);
-        free(num_chunks);
-        return cids;
-}
-      
-
-
-void cb_print(const struct chunk_trader * ct)
-{
-        struct chunk *chunks;
-        int num_chunks, i, j;
-        for(j=0;j<ct->flows_number;j++)
-        {
-                chunks = cb_get_chunks(ct->cbs[j], &num_chunks);
-
-                dprintf("\tchbuf #%i (%i elements, flow %i):",j,num_chunks, cb_get_flowid(ct->cbs[j]));
-                i = 0;
-                if(num_chunks)
-                {
-                        dprintf("%d -> ",chunks[0].id);
-                        for(i=0;i<num_chunks;i++)
-                        {
-                                dprintf("%d ",chunks[i].id% 100);
-                                dprintf("%c, ", 
-                                        (chunk_islocked(ct->ch_locks,
-                                                        chunks[i].flow_id, chunks[i].id))?
-                                        'l' : 'u');
-                        }
-                }
-                dprintf("\n");
-
-        }
-}
-
