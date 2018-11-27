@@ -158,6 +158,56 @@ int8_t dyn_chunk_buffer_insertable(struct dyn_chunk_buffer *dcb, struct chunk * 
 	return res;
 }
 
+int8_t _dyn_chunk_buffer_add_chunk(struct dyn_chunk_buffer * dcb, struct chunk * c)
+{
+	struct dyn_node *dnode,*ptr;
+	struct rb_node **new, *parent;
+	int64_t delta;
+
+	if (dcb->last_free < dcb->size)
+		dnode= &(dcb->nodes[dcb->last_free++]);
+	else
+	{
+		dnode = dyn_chunk_buffer_oldest(dcb);
+		rb_erase(&(dnode->time_node), &(dcb->time_root));
+		rb_erase(&(dnode->index_node), &(dcb->index_root));
+		chunk_free((struct chunk *)dnode);
+	}
+	memmove(dnode, c, sizeof(struct chunk));	// chunk parameter copying
+
+	new = &(dcb->time_root.rb_node);	
+	parent = NULL;
+	while (*new)
+	{
+		ptr = container_of(*new, struct dyn_node, time_node);
+		delta = c->timestamp - ((struct chunk *)ptr)->timestamp;
+		parent = *new;
+		if (delta < 0)
+			new = &((*new)->rb_left);
+		if (delta > 0)
+			new = &((*new)->rb_right);
+	}
+	rb_link_node(&dnode->time_node, parent, new);
+	rb_insert_color(&dnode->time_node, &dcb->time_root);
+
+	new = &(dcb->index_root.rb_node);	
+	parent = NULL;
+	while (*new)
+	{
+		ptr = container_of(*new, struct dyn_node, index_node);
+		delta = dyn_node_eval_index(ptr, c->id, c->flow_id);
+		parent = *new;
+		if (delta < 0)
+			new = &((*new)->rb_left);
+		if (delta > 0)
+			new = &((*new)->rb_right);
+	}
+	rb_link_node(&dnode->index_node, parent, new);
+	rb_insert_color(&dnode->index_node, &dcb->index_root);
+
+	return 0;
+}
+
 void dyn_chunk_buffer_reshape(struct dyn_chunk_buffer *dcb, uint32_t size)
 {
 	struct dyn_node * nodes, *dnode;
@@ -181,7 +231,7 @@ void dyn_chunk_buffer_reshape(struct dyn_chunk_buffer *dcb, uint32_t size)
 	{
 			dnode = container_of(node, struct dyn_node, time_node);
 			if (cnt < dcb->size)
-				dyn_chunk_buffer_add_chunk(dcb, (struct chunk *) dnode);
+				_dyn_chunk_buffer_add_chunk(dcb, (struct chunk *) dnode);
 			else 
 				chunk_free((struct chunk *) dnode);
 			cnt++;
@@ -209,62 +259,17 @@ void dyn_chunk_buffer_update(struct dyn_chunk_buffer * dcb)
 	size = size < MIN_BUFF_SIZE ? MIN_BUFF_SIZE : size;
 	if (size >= (dcb->size*2))
 		dyn_chunk_buffer_reshape(dcb, (dcb->size)*2);
-	if (size <= (((float)dcb->size)/4))
+	else if (size <= (((float)dcb->size)/4))
 		dyn_chunk_buffer_reshape(dcb, ((float)dcb->size)/2);
 }
 
 int8_t dyn_chunk_buffer_add_chunk(struct dyn_chunk_buffer * dcb, struct chunk * c)
 {
-	int8_t res = -1;
-	struct dyn_node *dnode,*ptr;
-	struct rb_node **new, *parent;
-	int64_t delta;
-
+	int8_t res=-1;
 	if (dcb && c && !dyn_chunk_buffer_insertable(dcb, c))
 	{
 		dyn_chunk_buffer_update(dcb);
-		if (dcb->last_free < dcb->size)
-			dnode= &(dcb->nodes[dcb->last_free++]);
-		else
-		{
-			dnode = dyn_chunk_buffer_oldest(dcb);
-			rb_erase(&(dnode->time_node), &(dcb->time_root));
-			rb_erase(&(dnode->index_node), &(dcb->index_root));
-			chunk_free((struct chunk *)dnode);
-		}
-		*((struct chunk *)dnode) = *c;	// chunk parameter copying
-
-		new = &(dcb->time_root.rb_node);	
-		parent = NULL;
-		while (*new)
-		{
-			ptr = container_of(*new, struct dyn_node, time_node);
-			delta = c->timestamp - ((struct chunk *)ptr)->timestamp;
-			parent = *new;
-			if (delta < 0)
-				new = &((*new)->rb_left);
-			if (delta > 0)
-				new = &((*new)->rb_right);
-		}
-		rb_link_node(&dnode->time_node, parent, new);
-		rb_insert_color(&dnode->time_node, &dcb->time_root);
-
-		new = &(dcb->index_root.rb_node);	
-		parent = NULL;
-		while (*new)
-		{
-			ptr = container_of(*new, struct dyn_node, index_node);
-			delta = dyn_node_eval_index(ptr, c->id, c->flow_id);
-			parent = *new;
-			if (delta < 0)
-				new = &((*new)->rb_left);
-			if (delta > 0)
-				new = &((*new)->rb_right);
-		}
-		rb_link_node(&dnode->index_node, parent, new);
-		rb_insert_color(&dnode->index_node, &dcb->index_root);
-
-		res = 0;
+		return _dyn_chunk_buffer_add_chunk(dcb, c);
 	}
 	return res;
 }

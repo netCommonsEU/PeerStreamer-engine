@@ -38,9 +38,9 @@ struct streaming_timers {
 
 int streaming_timers_init(struct streaming_timers * psl, suseconds_t offer_interval);
 
-void streaming_timers_set_timeout(struct streaming_timers * psl, suseconds_t interval, int8_t userfds);
+void streaming_timers_set_timeout(struct streaming_timers * psl, suseconds_t interval, int8_t time_input);
 
-enum streaming_action streaming_timers_state_handler(struct streaming_timers * psl, int data_state, int8_t input);
+enum streaming_action streaming_timers_state_handler(struct streaming_timers * psl, int data_state, int8_t time_input);
 
 int8_t streaming_timers_update_flag(struct streaming_timers * psl);
 

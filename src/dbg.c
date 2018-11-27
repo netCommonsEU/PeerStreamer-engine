@@ -104,7 +104,7 @@ void log_chunk(const struct nodeID *from,const struct nodeID *to,const struct ch
 		node_addr(to,rcvr,NODE_STR_LENGTH);
 
 	if (c)
-		fprintf(stderr,"[CHUNK_LOG],%"PRIu64",%s,%s,%d[%d],%d,%"PRIu64",%i,%s\n",gettimeofday_in_us(),sndr,rcvr,c->id,c->flow_id,c->size,c->timestamp,chunk_attributes_get_hopcount(c),note);
+		fprintf(stderr,"[CHUNK_LOG],%"PRIu64",%s,%s,%d,%d,%d,%"PRIu64",%i,%s\n",gettimeofday_in_us(),sndr,rcvr,c->id,c->flow_id,c->size,c->timestamp,chunk_attributes_get_hopcount(c),note);
 	else
 		fprintf(stderr,"[CHUNK_LOG],%"PRIu64",%s,%s,%d,%d,%d,%i,%s\n",gettimeofday_in_us(),sndr,rcvr,-1,-1,0,0,note);
 }

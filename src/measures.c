@@ -20,6 +20,7 @@
 
 #include<measures.h>
 #include<string.h>
+#include<stdio.h>
 
 #define DEFAULT_CHUNK_INTERVAL (1000000/25)
 
@@ -58,6 +59,11 @@ void measures_destroy(struct measures ** m)
 	{
 		free((*m));
 	}
+}
+
+int8_t reg_chunk_send(struct measures * m, struct chunk *c) 
+{
+	return reg_chunk_receive(m, c);
 }
 
 int8_t reg_chunk_receive(struct measures * m, struct chunk *c) 

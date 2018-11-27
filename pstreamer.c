@@ -54,7 +54,7 @@ void show_help()
 	fprintf(stdout, "\tbs_addr=<str>:\t\t\taddress of a bootstrap node\n");
 	fprintf(stdout, "\tbs_port=<int>:\t\t\tport of a bootstrap node (if any, default=6000)\n");
 
-	fprintf(stdout, "\tflow_id=<int>:\t\t\tflow_id of this peer (default=random)\n");
+	fprintf(stdout, "\tpeer_id=<int>:\t\t\tpeer_id of this peer (default=random)\n");
 	fprintf(stdout, "\toutbuff_size=<int>:\t\tsize in chunks for the output buffer (default=75)\n");
 	fprintf(stdout, "\tsource_multiplicity=<int>:\tnumber of chunks the source pushes in seeding (default=3)\n");
 	fprintf(stdout, "\tfilename=<string>:\t\tfilename of a media content to be streamed (source side only)\n");
@@ -100,7 +100,7 @@ int main(int argc, char **argv)
 
 	if (running)
 	{
-		srand(time(NULL));   // init seed for random genetator (used for flow_id numbers)
+		srand(time(NULL));   // init seed for random genetator (used for peer_id numbers)
 		ps = psinstance_create(config);
 		while (ps && running)
 			psinstance_poll(ps, 5000000);

@@ -76,7 +76,7 @@ int config_parse(struct psinstance * ps, const char * config, char **bs_addr)
 	tmp_str = grapes_config_value_str_default(tags, "AF", NULL);
 	ps->l3 = tmp_str && (strcmp(tmp_str, "INET6") == 0) ? IP6 : IP4;
 
-	grapes_config_value_int_default(tags, "flow_id", &id, 0);
+	grapes_config_value_int_default(tags, "peer_id", &id, 0);
 	if (!id)
 		id = rand();
 	ps->peer_id = (flowid_t) id;
@@ -143,8 +143,7 @@ struct psinstance * psinstance_create(const char * config)
 				fprintf(stderr, "[ERROR] Could not join node %s:%d", bs_addr, bs_port);
 		}
 		ps->inc.fds[0] = -1;
-		ps->input = input_open((ps->inc).filename, (ps->inc).fds, (ps->inc).fds_size, config);
-		(ps->inc).fds[(ps->inc).fds_size] = -1;
+		ps->input = input_open(&(ps->inc), config);
 		ps->chunk_out = output_create(ps->measure, config);
 	}
 	else
@@ -225,8 +224,10 @@ int8_t psinstance_inject_chunk(struct psinstance * ps)
 		new_chunk = input_chunk(ps->input, &(ps->chunk_time_interval));
 		if(new_chunk) 
 		{
+			new_chunk->flow_id = ps->peer_id;
 			if(!chunk_trader_add_chunk(ps->trader, new_chunk))
 			{
+				reg_chunk_send(ps->measure, new_chunk);
 				chunk_trader_push_chunk(ps->trader, new_chunk, ps->source_multiplicity);
 				free(new_chunk);
 			}
@@ -293,9 +294,9 @@ int8_t psinstance_handle_msg(struct psinstance * ps)
 	return res;
 }
 
-int8_t psinstance_has_input(const struct psinstance *ps)
+int8_t psinstance_has_timebased_input(const struct psinstance *ps)
 {
-	return ps->input ? 1 : 0;
+	return ps->input && (ps->inc.fds[0] == -1) ? 1 : 0;
 }
 
 int psinstance_poll(struct psinstance *ps, suseconds_t delta)
@@ -305,11 +306,11 @@ int psinstance_poll(struct psinstance *ps, suseconds_t delta)
 
 	if (ps)
 	{
-		streaming_timers_set_timeout(&ps->timers, delta, psinstance_has_input(ps) && ps->inc.fds[0] == -1);
+		streaming_timers_set_timeout(&ps->timers, delta, psinstance_has_timebased_input(ps));
 		dtprintf("[DEBUG] timer: %lu %lu\n", ps->timers.sleep_timer.tv_sec, ps->timers.sleep_timer.tv_usec); 
 		data_state = wait4data(ps->my_sock, &(ps->timers.sleep_timer), ps->inc.fds);
 
-		required_action = streaming_timers_state_handler(&ps->timers, data_state, psinstance_has_input(ps));
+		required_action = streaming_timers_state_handler(&ps->timers, data_state, psinstance_has_timebased_input(ps));
 		
 		switch (required_action) {
 			case OFFER_ACTION:

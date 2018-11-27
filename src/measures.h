@@ -37,6 +37,7 @@ void measures_destroy(struct measures ** m);
 /*************Storing functions***************/
 
 int8_t reg_chunk_receive(struct measures * m, struct chunk *c);
+int8_t reg_chunk_send(struct measures * m, struct chunk *c);
 
 /*************Get functions***************/
 suseconds_t chunk_interval_measure(const struct measures * m);

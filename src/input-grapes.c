@@ -36,7 +36,7 @@
 #include<chunk_attributes.h>
 
 #define INITIAL_ID 0
-#define DEFAULT_DATA_INTERVAL 3000
+#define DEFAULT_DATA_INTERVAL 30000
 
 struct input_desc {
   struct input_stream *s;
@@ -46,7 +46,7 @@ struct input_desc {
   uint64_t first_ts;
 };
 
-struct input_desc *input_open(const char *fname, int *fds, int fds_size, const char * config)
+struct input_desc *input_open(struct input_context * ctx, const char * config)
 {
   struct input_desc *res = NULL;
   struct timeval tv;
@@ -54,7 +54,7 @@ struct input_desc *input_open(const char *fname, int *fds, int fds_size, const c
   res = malloc(sizeof(struct input_desc));
   memset(res, 0, sizeof(struct input_desc));
 
-  res->s = input_stream_open(fname, &res->interframe, config);
+  res->s = input_stream_open(ctx->filename, &res->interframe, config);
   if (res->s)
   {
 	  if (res->interframe == 0) {
@@ -63,13 +63,13 @@ struct input_desc *input_open(const char *fname, int *fds, int fds_size, const c
 
 		my_fds = input_get_fds(res->s);
 		while(my_fds[i] != -1) {
-		  fds[i] = my_fds[i];
+		  ctx->fds[i] = my_fds[i];
 		  i = i + 1;
 		}
-		fds[i] = -1;
+		ctx->fds[i] = -1;
 	  } else {
-		if (fds_size >= 1) {
-		  fds[0] = -1; //This input module needs no fds to monitor
+		if (ctx->fds_size >= 1) {
+		  ctx->fds[0] = -1; //This input module needs no fds to monitor
 		}
 		gettimeofday(&tv, NULL);
 		res->start_time = tv.tv_usec + tv.tv_sec * 1000000ULL;

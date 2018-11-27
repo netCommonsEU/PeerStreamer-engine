@@ -372,7 +372,7 @@ int8_t chunk_trader_handle_accept(struct chunk_trader *ct, struct peer *p, struc
 	transaction_reg_accept(ct->transactions, transid, p->id);
 
 	iter = chunkID_multiSet_iterator_create(cset);
-	while(!res)
+	while(!res && pairs_len < max_chunks)
 	{
 		res = chunkID_multiSet_iterator_next(iter, &cid, &fid);
 		c = dyn_chunk_buffer_get_chunk(ct->cb, cid, fid);

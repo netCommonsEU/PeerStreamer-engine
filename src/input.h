@@ -37,7 +37,7 @@ struct input_context {
 	int fds_size;
 };
 
-struct input_desc *input_open(const char *fname, int *fds, int fds_size, const char * config);
+struct input_desc *input_open(struct input_context * ctx, const char * config);
 void input_close(struct input_desc *s);
 
 /*

@@ -74,6 +74,8 @@ void net_helper_send_attempt(struct nodeID *s, struct timeval *interval)
 			net_helper_send_msg(s, msg);
 			network_shaper_register_sent_bytes(s->shaper, 0);
 			network_shaper_next_sending_interval(s->shaper, interval);
+			if (msg->type == NET_FRAGMENT_REQ)
+				frag_request_destroy((struct frag_request**) &msg);
 		}
 	} else {  // in case we have an empty outqueue we have to poll it periodically...
 		interval->tv_sec = 0;
