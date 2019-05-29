@@ -1,4 +1,4 @@
-GRAPES ?= $(PWD)/../../../grapes
+GRAPES ?= $(PWD)/../../../GRAPES
 TARGET=libnethelper.a
 
 SRC=net_helpers.c

@@ -47,9 +47,9 @@
 #include<frag_request.h>
 
 struct nodeID {
+	int fd;  // do not move, stun_client relies on its position
 	struct sockaddr_storage addr;
 	uint16_t occurrences;
-	int fd;
 	struct network_manager * nm;
 	struct network_shaper * shaper;
 	uint8_t * sending_buffer;
