@@ -63,9 +63,17 @@ uint8_t * stun_packet(struct stun_client *c, size_t *len)
 			*(int32_t*)(buff+8) = htons(rand());  // transaction ID
 			*(int32_t*)(buff+12) = htons(rand());
 			*(int32_t*)(buff+16) = htons(rand()); 
-
 		} else if (c->state == BINDED) //generate an indication
 		{
+			*len = 20;
+			buff = malloc(sizeof(uint8_t)*(*len));
+			*(int16_t*)(buff) = htons(0x0011);  // stun_method
+			*(int16_t*)(buff+2) = htons(0x0000);  // msg_length
+			*(int32_t*)(buff+4) = htons((int16_t)0x2112A442);  // magic cookie
+
+			*(int32_t*)(buff+8) = htons(rand());  // transaction ID
+			*(int32_t*)(buff+12) = htons(rand());
+			*(int32_t*)(buff+16) = htons(rand()); 
 		}
 	}
 	return buff;
